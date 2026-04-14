@@ -1,4 +1,3 @@
-import { FontAwesome6 } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,26 +5,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.screen}>
-      <View style={styles.glow} />
-
-      <View style={styles.card}>
-        <View style={styles.logoBox}>
-          {/* Placeholder icon, replace with your image logo when ready. */}
-          <FontAwesome6 name="motorcycle" size={112} color="#f8cd63" />
-        </View>
-
+      <View style={styles.heroCard}>
         <Text style={styles.title}>MotoMarket</Text>
-        <Text style={styles.subtitle}>Your Premium Motorcycle Marketplace</Text>
+        <Text style={styles.subtitle}>Welcome back, ready to find your dream bike?</Text>
 
-        <Pressable style={styles.ctaButton} onPress={() => router.push('/(tabs)/explore')}>
-          <Text style={styles.ctaText}>Find Your Dream Ride</Text>
+        <Pressable style={styles.primaryButton} onPress={() => router.push('/(tabs)/explore')}>
+          <Text style={styles.primaryButtonText}>Browse Marketplace</Text>
         </Pressable>
-
-        <View style={styles.dots}>
-          <View style={[styles.dot, styles.dotActive]} />
-          <View style={styles.dot} />
-          <View style={styles.dot} />
-        </View>
       </View>
     </SafeAreaView>
   );
@@ -34,77 +20,36 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#ff5b00',
+    backgroundColor: '#fff3ea',
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
+    padding: 20,
   },
-  glow: {
-    position: 'absolute',
-    width: 420,
-    height: 420,
-    borderRadius: 210,
-    backgroundColor: '#ff6f1a',
-    opacity: 0.45,
-    bottom: -130,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 360,
+  heroCard: {
+    backgroundColor: '#ff6f10',
     borderRadius: 18,
-    backgroundColor: '#ea7c42',
-    paddingHorizontal: 24,
-    paddingTop: 40,
-    paddingBottom: 34,
-    alignItems: 'center',
-    shadowColor: '#9f2d00',
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.3,
-    shadowRadius: 22,
-    elevation: 12,
-  },
-  logoBox: {
-    height: 150,
-    justifyContent: 'center',
-    marginBottom: 10,
+    padding: 24,
   },
   title: {
-    fontSize: 42,
+    fontSize: 34,
     fontWeight: '800',
-    color: '#f6c55f',
-    letterSpacing: 0.8,
+    color: '#ffffff',
   },
   subtitle: {
-    marginTop: 8,
-    color: '#ffe2c7',
-    fontSize: 17,
-    textAlign: 'center',
-    paddingHorizontal: 6,
+    marginTop: 10,
+    color: '#ffe0ca',
+    fontSize: 16,
+    lineHeight: 22,
   },
-  ctaButton: {
-    marginTop: 98,
-    backgroundColor: '#d84a00',
-    borderRadius: 999,
+  primaryButton: {
+    marginTop: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
     paddingVertical: 12,
-    paddingHorizontal: 24,
+    alignItems: 'center',
   },
-  ctaText: {
-    color: '#fff6eb',
+  primaryButtonText: {
+    color: '#ff6f10',
     fontSize: 16,
     fontWeight: '700',
-  },
-  dots: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 28,
-  },
-  dot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-    backgroundColor: '#d95816',
-  },
-  dotActive: {
-    backgroundColor: '#b93a00',
   },
 });
