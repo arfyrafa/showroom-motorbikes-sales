@@ -77,20 +77,28 @@ export function useMotorcycles() {
 
   const fetchMotorcycles = useCallback(async () => {
     setError(null);
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('motorcycles')
+        .select('id,title,price,location,image,image_url,rating,year,engine_capacity,mileage,description')
+        .order('created_at', { ascending: false });
 
-    const { data, error: fetchError } = await supabase
-      .from('motorcycles')
-      .select('id,title,price,location,image,image_url,rating,year,engine_capacity,mileage,description')
-      .order('created_at', { ascending: false });
+      if (fetchError) {
+        console.error('❌ Database fetch error:', fetchError);
+        setError(fetchError.message || 'Database connection failed');
+        setMotorcycles([]);
+        return;
+      }
 
-    if (fetchError) {
-      setError(fetchError.message);
+      console.log('✅ Motorcycles fetched:', data?.length ?? 0);
+      const mapped = (data ?? []).map((row: unknown) => mapRowToMotorcycle(row as RawMotorcycleRow));
+      setMotorcycles(mapped);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('❌ Motorcycles fetch exception:', message);
+      setError(message);
       setMotorcycles([]);
-      return;
     }
-
-    const mapped = (data ?? []).map((row: unknown) => mapRowToMotorcycle(row as RawMotorcycleRow));
-    setMotorcycles(mapped);
   }, []);
 
   useEffect(() => {

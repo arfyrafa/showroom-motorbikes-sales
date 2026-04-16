@@ -40,6 +40,25 @@ const MOCK_USERS = [
 ];
 
 const STORAGE_KEY = '@auth_user';
+const STORAGE_USERS_KEY = '@registered_users';
+
+async function getRegisteredUsers() {
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_USERS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error('Error getting registered users:', error);
+    return [];
+  }
+}
+
+async function saveRegisteredUsers(users: any[]) {
+  try {
+    await AsyncStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
+  } catch (error) {
+    console.error('Error saving registered users:', error);
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -66,7 +85,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const foundUser = MOCK_USERS.find((u) => u.email === email && u.password === password);
+      // Check mock users first
+      let foundUser = MOCK_USERS.find((u) => u.email === email && u.password === password);
+
+      // If not found in mock, check registered users
+      if (!foundUser) {
+        const registeredUsers = await getRegisteredUsers();
+        const registered = registeredUsers.find(
+          (u: any) => u.email === email && u.password === password
+        );
+        if (registered) {
+          foundUser = registered;
+        }
+      }
 
       if (!foundUser) {
         throw new Error('Email atau password salah');
@@ -99,8 +130,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = useCallback(async (email: string, password: string, name: string) => {
     setIsLoading(true);
     try {
-      // For demo, tidak bisa register user baru (hanya mock users)
-      throw new Error('Demo mode: hanya bisa login dengan akun yang sudah ada');
+      // Check if email sudah digunakan
+      let existingUser = MOCK_USERS.find((u) => u.email === email);
+      if (!existingUser) {
+        const registeredUsers = await getRegisteredUsers();
+        existingUser = registeredUsers.find((u: any) => u.email === email);
+      }
+
+      if (existingUser) {
+        throw new Error('Email sudah digunakan');
+      }
+
+      // Create new user
+      const registeredUsers = await getRegisteredUsers();
+      const newUser = {
+        id: `reg_${Date.now()}`,
+        email,
+        password,
+        name,
+        role: 'user' as UserRole,
+      };
+
+      registeredUsers.push(newUser);
+      await saveRegisteredUsers(registeredUsers);
+
+      // Auto login after registration
+      const authUser: AuthUser = {
+        id: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role,
+      };
+
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
+      setUser(authUser);
     } finally {
       setIsLoading(false);
     }

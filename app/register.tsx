@@ -1,10 +1,52 @@
+import { useAuth } from '@/lib/auth-context';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Link, router } from 'expo-router';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Link } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function RegisterScreen() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { register } = useAuth();
+
+  const handleSignUp = async () => {
+    // Validation
+    if (!name || !email || !password || !confirmPassword) {
+      Alert.alert('Error', 'Semua field harus diisi');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Password tidak sama');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password minimal 6 karakter');
+      return;
+    }
+
+    if (!email.includes('@')) {
+      Alert.alert('Error', 'Email tidak valid');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await register(email, password, name);
+      // Auto login setelah register
+    } catch (error) {
+      Alert.alert('Signup Gagal', error instanceof Error ? error.message : 'Terjadi kesalahan');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.card}>
@@ -22,7 +64,14 @@ export default function RegisterScreen() {
             <View style={styles.iconBadge}>
               <FontAwesome6 name="user" size={14} color="#8b95a5" />
             </View>
-            <TextInput style={styles.input} placeholder="Full Name" placeholderTextColor="#9aa3af" />
+            <TextInput 
+              style={styles.input} 
+              placeholder="Full Name" 
+              placeholderTextColor="#9aa3af"
+              value={name}
+              onChangeText={setName}
+              editable={!isLoading}
+            />
           </View>
 
           <View style={styles.inputRow}>
@@ -35,6 +84,9 @@ export default function RegisterScreen() {
               placeholderTextColor="#9aa3af"
               keyboardType="email-address"
               autoCapitalize="none"
+              value={email}
+              onChangeText={setEmail}
+              editable={!isLoading}
             />
           </View>
 
@@ -44,9 +96,12 @@ export default function RegisterScreen() {
             </View>
             <TextInput
               style={styles.input}
-              placeholder="Password"
+              placeholder="Password (min 6 chars)"
               placeholderTextColor="#9aa3af"
               secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+              editable={!isLoading}
             />
           </View>
 
@@ -59,11 +114,22 @@ export default function RegisterScreen() {
               placeholder="Confirm Password"
               placeholderTextColor="#9aa3af"
               secureTextEntry
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              editable={!isLoading}
             />
           </View>
 
-          <Pressable style={styles.primaryButton} onPress={() => router.replace('/(tabs)')}>
-            <Text style={styles.primaryButtonText}>Sign Up</Text>
+          <Pressable 
+            style={[styles.primaryButton, isLoading && { opacity: 0.6 }]} 
+            onPress={handleSignUp}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.primaryButtonText}>Sign Up</Text>
+            )}
           </Pressable>
 
           <Text style={styles.footerText}>
@@ -75,7 +141,9 @@ export default function RegisterScreen() {
         </View>
       </View>
 
-      <Text style={styles.demoText}>Demo: Use any email and password to login</Text>
+      <Text style={styles.demoText}>Demo: Bisa bikin akun baru atau gunakan:
+{'\n'}admin@showroom.com / admin123
+{'\n'}user@showroom.com / user123</Text>
     </SafeAreaView>
   );
 }
