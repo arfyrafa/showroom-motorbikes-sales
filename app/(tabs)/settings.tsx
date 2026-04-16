@@ -16,8 +16,12 @@ export default function SettingsScreen() {
         {
           text: 'Logout',
           onPress: async () => {
-            await logout();
-            router.replace('/login');
+            try {
+              await logout();
+              // Auth state change akan trigger redirect di _layout via useEffect
+            } catch (error) {
+              Alert.alert('Error', 'Logout gagal');
+            }
           },
           style: 'destructive',
         },

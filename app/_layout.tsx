@@ -19,11 +19,13 @@ function RootLayoutNav() {
 
     const inAuthGroup = segments[0] === '(auth)' || segments[0] === 'login' || segments[0] === 'register' || segments[0] === 'index';
 
-    if (!isSignedIn && !inAuthGroup) {
-      // Redirect ke login jika belum signin
-      router.replace('/login');
+    if (!isSignedIn) {
+      // ALWAYS go to login if not signed in, regardless of current screen
+      if (segments[0] !== 'login' && segments[0] !== 'register' && segments[0] !== 'index') {
+        router.replace('/login');
+      }
     } else if (isSignedIn && inAuthGroup) {
-      // Redirect ke tabs jika sudah signin
+      // Go to tabs if signed in but on auth screen
       router.replace('/(tabs)');
     }
   }, [isSignedIn, isLoading, segments, router]);
