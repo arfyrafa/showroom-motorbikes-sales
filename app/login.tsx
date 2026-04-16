@@ -1,10 +1,33 @@
+import { useAuth } from '@/lib/auth-context';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Link, router } from 'expo-router';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Email dan password harus diisi');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await login(email, password);
+      // Navigasi otomatis via useEffect di app layout
+    } catch (error) {
+      Alert.alert('Login Gagal', error instanceof Error ? error.message : 'Terjadi kesalahan');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.card}>
@@ -29,6 +52,9 @@ export default function LoginScreen() {
               placeholderTextColor="#9aa3af"
               keyboardType="email-address"
               autoCapitalize="none"
+              value={email}
+              onChangeText={setEmail}
+              editable={!isLoading}
             />
           </View>
 
@@ -42,23 +68,31 @@ export default function LoginScreen() {
               placeholder="Enter your password"
               placeholderTextColor="#9aa3af"
               secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+              editable={!isLoading}
             />
           </View>
 
-          <Pressable style={styles.primaryButton} onPress={() => router.replace('/(tabs)')}>
-            <Text style={styles.primaryButtonText}>Sign In</Text>
+          <Pressable 
+            style={[styles.primaryButton, isLoading && { opacity: 0.6 }]} 
+            onPress={handleLogin}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.primaryButtonText}>Sign In</Text>
+            )}
           </Pressable>
 
           <Text style={styles.footerText}>
-            New to MotoMarket?{' '}
-            <Link href="/register" style={styles.linkText}>
-              Create Account
-            </Link>
+            Demo users available - no register yet{' '}
           </Text>
         </View>
       </View>
 
-      <Text style={styles.demoText}>Demo: Use any email and password to login</Text>
+      <Text style={styles.demoText}>Demo:{'\n'}admin@showroom.com / admin123{'\n'}user@showroom.com / user123</Text>
     </SafeAreaView>
   );
 }

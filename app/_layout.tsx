@@ -1,12 +1,32 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { AuthProvider, useAuth } from '@/lib/auth-context';
 
-export default function RootLayout() {
+// Component yang handle auth-aware routing
+function RootLayoutNav() {
   const colorScheme = useColorScheme();
+  const { isSignedIn, isLoading } = useAuth();
+  const router = useRouter();
+  const segments = useSegments();
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === '(auth)' || segments[0] === 'login' || segments[0] === 'register' || segments[0] === 'index';
+
+    if (!isSignedIn && !inAuthGroup) {
+      // Redirect ke login jika belum signin
+      router.replace('/login');
+    } else if (isSignedIn && inAuthGroup) {
+      // Redirect ke tabs jika sudah signin
+      router.replace('/(tabs)');
+    }
+  }, [isSignedIn, isLoading, segments, router]);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -25,5 +45,13 @@ export default function RootLayout() {
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <RootLayoutNav />
+    </AuthProvider>
   );
 }

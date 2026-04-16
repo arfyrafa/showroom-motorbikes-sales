@@ -2,22 +2,24 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useMotorcycles } from '@/hooks/use-motorcycles';
+import { useAuth } from '@/lib/auth-context';
 
 export default function AdminMotorcycleScreen() {
   const { createMotorcycleByAdmin } = useMotorcycles();
+  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [location, setLocation] = useState('');
@@ -28,6 +30,14 @@ export default function AdminMotorcycleScreen() {
   const [imageUri, setImageUri] = useState('');
   const [imageType, setImageType] = useState<string | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Gate: hanya admin yang bisa akses
+  useEffect(() => {
+    if (user && user.role !== 'admin') {
+      Alert.alert('Access Denied', 'Hanya admin yang bisa akses halaman ini.');
+      router.back();
+    }
+  }, [user]);
 
   const handlePickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
