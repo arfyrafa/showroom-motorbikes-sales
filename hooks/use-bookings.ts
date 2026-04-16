@@ -1,4 +1,4 @@
-import { MOTORCYCLES, Motorcycle } from '@/constants/motorcycles';
+import { Motorcycle } from '@/constants/motorcycles';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -15,11 +15,6 @@ export function useBookings() {
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load bookings from storage
-  useEffect(() => {
-    loadBookings();
-  }, []);
-
   const loadBookings = useCallback(async () => {
     try {
       const stored = await AsyncStorage.getItem(BOOKINGS_STORAGE_KEY);
@@ -33,15 +28,17 @@ export function useBookings() {
     }
   }, []);
 
-  const addBooking = useCallback(
-    async (motorcycleId: string, type: 'view' | 'interested' = 'view') => {
-      try {
-        const motorcycle = MOTORCYCLES.find((m) => m.id === motorcycleId);
-        if (!motorcycle) return;
+  // Load bookings from storage
+  useEffect(() => {
+    loadBookings();
+  }, [loadBookings]);
 
+  const addBooking = useCallback(
+    async (motorcycle: Motorcycle, type: 'view' | 'interested' = 'view') => {
+      try {
         // Check if already interested in this motorcycle
         const existingInterested = bookings.find(
-          (b) => b.motorcycle.id === motorcycleId && b.type === 'interested'
+          (b) => b.motorcycle.id === motorcycle.id && b.type === 'interested'
         );
 
         if (existingInterested && type === 'interested') {
@@ -49,7 +46,7 @@ export function useBookings() {
         }
 
         const newBooking: BookingRecord = {
-          id: `${motorcycleId}-${Date.now()}`,
+          id: `${motorcycle.id}-${Date.now()}`,
           motorcycle,
           type,
           timestamp: Date.now(),

@@ -12,18 +12,19 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MotorcycleCard } from '@/components/motorcycle-card';
-import { MOTORCYCLES } from '@/constants/motorcycles';
+import { useMotorcycles } from '@/hooks/use-motorcycles';
 
 export default function TabTwoScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const { motorcycles, isLoading, error, refresh } = useMotorcycles();
 
   const filteredMotorcycles = useMemo(() => {
-    return MOTORCYCLES.filter((motorcycle) =>
+    return motorcycles.filter((motorcycle) =>
       motorcycle.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       motorcycle.location.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery]);
+  }, [motorcycles, searchQuery]);
 
   const handleMotorcyclePress = (id: string) => {
     router.push({
@@ -74,6 +75,15 @@ export default function TabTwoScreen() {
           />
         )}
         contentContainerStyle={styles.listContent}
+        refreshing={isLoading}
+        onRefresh={refresh}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              {error ? `Gagal load data: ${error}` : 'Belum ada motor tersedia'}
+            </Text>
+          </View>
+        }
         scrollEnabled
         nestedScrollEnabled
       />
@@ -141,5 +151,14 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 16,
+  },
+  emptyContainer: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: '#777',
+    fontSize: 14,
+    textAlign: 'center',
   },
 });

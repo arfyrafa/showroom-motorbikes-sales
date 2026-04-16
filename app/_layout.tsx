@@ -20,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="settings-preferences" options={{ headerShown: false }} />
         <Stack.Screen name="settings-account" options={{ headerShown: false }} />
         <Stack.Screen name="settings-change-password" options={{ headerShown: false }} />
+        <Stack.Screen name="admin-motorcycle" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />

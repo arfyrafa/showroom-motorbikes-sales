@@ -29,7 +29,7 @@ const DEFAULT_PROFILE: UserProfile = {
 };
 
 const DEFAULT_PREFERENCES: UserPreferences = {
-  currency: 'USD',
+  currency: 'IDR',
   theme: 'light',
 };
 

@@ -29,6 +29,14 @@ export default function SettingsScreen() {
       color: '#F44336',
       route: '/settings-account',
     },
+    {
+      id: 'admin-motor',
+      label: 'Admin Motor',
+      description: 'Input motor baru dan upload gambar',
+      icon: 'motorcycle' as const,
+      color: '#1F7A4D',
+      route: '/admin-motorcycle',
+    },
   ];
 
   return (

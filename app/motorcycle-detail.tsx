@@ -5,23 +5,31 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { MOTORCYCLES } from '@/constants/motorcycles';
 import { useBookings } from '@/hooks/use-bookings';
+import { useMotorcycles } from '@/hooks/use-motorcycles';
 
 export default function MotorcycleDetailScreen() {
   const { id } = useLocalSearchParams();
   const { addBooking, bookings } = useBookings();
+  const { motorcycles, isLoading } = useMotorcycles();
   const [isInterested, setIsInterested] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   
-  const motorcycle = MOTORCYCLES.find((m) => m.id === id);
+  const motorcycle = motorcycles.find((m) => m.id === id);
+  const formattedPrice = motorcycle
+    ? motorcycle.price.toLocaleString('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        maximumFractionDigits: 0,
+      })
+    : '';
 
   // Track view and check if interested
   useEffect(() => {
-    if (id && typeof id === 'string') {
-      addBooking(id, 'view');
+    if (id && typeof id === 'string' && motorcycle) {
+      addBooking(motorcycle, 'view');
     }
-  }, [id, addBooking]);
+  }, [id, motorcycle, addBooking]);
 
   // Check if user is already interested in this motorcycle
   useEffect(() => {
@@ -34,13 +42,21 @@ export default function MotorcycleDetailScreen() {
   }, [motorcycle, bookings]);
 
   const handleInterestedPress = async () => {
-    if (id && typeof id === 'string') {
-      await addBooking(id, 'interested');
+    if (id && typeof id === 'string' && motorcycle) {
+      await addBooking(motorcycle, 'interested');
       setIsInterested(true);
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 2000);
     }
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.screen}>
+        <Text style={styles.errorText}>Loading...</Text>
+      </SafeAreaView>
+    );
+  }
 
   if (!motorcycle) {
     return (
@@ -74,7 +90,7 @@ export default function MotorcycleDetailScreen() {
         <View style={styles.content}>
           {/* Title and Price */}
           <Text style={styles.title}>{motorcycle.title}</Text>
-          <Text style={styles.price}>${motorcycle.price.toLocaleString()}</Text>
+          <Text style={styles.price}>{formattedPrice}</Text>
 
           {/* Location */}
           <View style={styles.locationRow}>

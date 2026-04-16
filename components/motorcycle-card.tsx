@@ -9,6 +9,12 @@ interface MotorcycleCardProps {
 }
 
 export function MotorcycleCard({ motorcycle, onPress }: MotorcycleCardProps) {
+  const formattedPrice = motorcycle.price.toLocaleString('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  });
+
   return (
     <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.imageContainer}>
@@ -31,7 +37,7 @@ export function MotorcycleCard({ motorcycle, onPress }: MotorcycleCardProps) {
 
         <View style={styles.footerContainer}>
           <View>
-            <Text style={styles.price}>${motorcycle.price.toLocaleString()}</Text>
+            <Text style={styles.price}>{formattedPrice}</Text>
             <View style={styles.locationRow}>
               <FontAwesome6 name="location-dot" size={12} color="#666" />
               <Text style={styles.location}>{motorcycle.location}</Text>
