@@ -78,14 +78,17 @@ export function useMotorcycles() {
   const fetchMotorcycles = useCallback(async () => {
     setError(null);
     try {
+      console.log('🔍 Fetching motorcycles from Supabase...');
       const { data, error: fetchError } = await supabase
         .from('motorcycles')
         .select('id,title,price,location,image,image_url,rating,year,engine_capacity,mileage,description')
         .order('created_at', { ascending: false });
 
       if (fetchError) {
-        console.error('❌ Database fetch error:', fetchError);
-        setError(fetchError.message || 'Database connection failed');
+        const errorMsg = fetchError.message || JSON.stringify(fetchError) || 'Unknown database error';
+        console.error('❌ Database fetch error:', errorMsg);
+        console.error('❌ Full error object:', fetchError);
+        setError(errorMsg);
         setMotorcycles([]);
         return;
       }
@@ -96,6 +99,7 @@ export function useMotorcycles() {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('❌ Motorcycles fetch exception:', message);
+      console.error('❌ Full error:', err);
       setError(message);
       setMotorcycles([]);
     }

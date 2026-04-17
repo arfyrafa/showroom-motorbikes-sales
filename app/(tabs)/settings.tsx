@@ -1,7 +1,7 @@
 import { useAuth } from '@/lib/auth-context';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SettingsScreen() {
@@ -19,7 +19,7 @@ export default function SettingsScreen() {
             try {
               await logout();
               // Auth state change akan trigger redirect di _layout via useEffect
-            } catch (error) {
+            } catch {
               Alert.alert('Error', 'Logout gagal');
             }
           },
@@ -74,59 +74,48 @@ export default function SettingsScreen() {
         <Text style={styles.title}>Settings</Text>
       </View>
 
-      {/* User Info Card */}
-      <View style={styles.userCard}>
-        <View style={styles.useravatar}>
-          <FontAwesome6 name="user-circle" size={48} color="#1F7A4D" />
-        </View>
-        <View style={styles.userInfo}>
-          <Text style={styles.userName}>{user?.name}</Text>
-          <Text style={styles.userEmail}>{user?.email}</Text>
-          <View style={[styles.roleBadge, { backgroundColor: user?.role === 'admin' ? '#1F7A4D' : '#007AFF' }]}>
-            <Text style={styles.roleText}>{user?.role?.toUpperCase()}</Text>
+      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* User Info Card */}
+        <View style={styles.userCard}>
+          <View style={styles.useravatar}>
+            <FontAwesome6 name="user-circle" size={48} color="#1F7A4D" />
           </View>
-        </View>
-      </View>
-
-      <View style={styles.content}>
-        {menuItems.map((item) => (
-          <Pressable
-            key={item.id}
-            style={styles.menuItem}
-            onPress={() => router.push(item.route as any)}
-          >
-            <View style={[styles.iconContainer, { backgroundColor: item.color + '20' }]}>
-              <FontAwesome6 name={item.icon} size={24} color={item.color} />
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{user?.name}</Text>
+            <Text style={styles.userEmail}>{user?.email}</Text>
+            <View style={[styles.roleBadge, { backgroundColor: user?.role === 'admin' ? '#1F7A4D' : '#007AFF' }]}>
+              <Text style={styles.roleText}>{user?.role?.toUpperCase()}</Text>
             </View>
-
-            <View style={styles.menuItemContent}>
-              <Text style={styles.menuItemLabel}>{item.label}</Text>
-              <Text style={styles.menuItemDescription}>{item.description}</Text>
-            </View>
-
-            <FontAwesome6 name="chevron-right" size={20} color="#ddd" />
-          </Pressable>
-        ))}
-
-        {/* Logout Button */}
-        <Pressable style={[styles.menuItem, styles.logoutButton]} onPress={handleLogout}>
-          <View style={[styles.iconContainer, { backgroundColor: '#F4433620' }]}>
-            <FontAwesome6 name="sign-out" size={24} color="#F44336" />
           </View>
+        </View>
 
-          <View style={styles.menuItemContent}>
-            <Text style={[styles.menuItemLabel, { color: '#F44336' }]}>Logout</Text>
-            <Text style={styles.menuItemDescription}>Sign out dari akun Anda</Text>
-          </View>
+        <View style={styles.content}>
+          {menuItems.map((item) => (
+            <Pressable
+              key={item.id}
+              style={styles.menuItem}
+              onPress={() => router.push(item.route as any)}
+            >
+              <View style={[styles.iconContainer, { backgroundColor: item.color + '20' }]}>
+                <FontAwesome6 name={item.icon} size={24} color={item.color} />
+              </View>
 
-          <FontAwesome6 name="chevron-right" size={20} color="#ddd" />
-        </Pressable>
-      </View>
+              <View style={styles.menuItemContent}>
+                <Text style={styles.menuItemLabel}>{item.label}</Text>
+                <Text style={styles.menuItemDescription}>{item.description}</Text>
+              </View>
 
-      <View style={styles.footer}>
-        <Text style={styles.appVersion}>MotoMarket Version 1.0.0</Text>
-        <Text style={styles.copyright}>© 2025 MotoMarket. All rights reserved.</Text>
-      </View>
+              <FontAwesome6 name="chevron-right" size={20} color="#ddd" />
+            </Pressable>
+          ))}
+
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={styles.appVersion}>MotoMarket Version 1.0.0</Text>
+          <Text style={styles.copyright}>© 2025 MotoMarket. All rights reserved.</Text>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -135,6 +124,9 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: '#f9f9f9',
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   header: {
     backgroundColor: '#fff',

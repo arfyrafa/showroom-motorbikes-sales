@@ -1,6 +1,7 @@
 import { useAuth } from '@/lib/auth-context';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -87,7 +88,13 @@ export default function LoginScreen() {
           </Pressable>
 
           <Text style={styles.footerText}>
-            Demo users available - no register yet{' '}
+            Don't have an account?{' '}
+            <Text
+              style={styles.linkText}
+              onPress={() => router.push('/register')}
+            >
+              Sign Up
+            </Text>
           </Text>
         </View>
       </View>

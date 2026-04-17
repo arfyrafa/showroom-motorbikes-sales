@@ -67,7 +67,7 @@ export default function SettingsAccountScreen() {
           <Pressable style={styles.option} onPress={handleLogout}>
             <View style={styles.optionLeft}>
               <View style={styles.iconContainer}>
-                <FontAwesome6 name="arrow-right-from-bracket" size={18} color="#666" />
+                <FontAwesome6 name="power-off" size={18} color="#F44336" />
               </View>
               <View>
                 <Text style={styles.optionLabel}>Logout</Text>

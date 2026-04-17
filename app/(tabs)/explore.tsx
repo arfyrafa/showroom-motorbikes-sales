@@ -2,12 +2,13 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -75,13 +76,31 @@ export default function TabTwoScreen() {
           />
         )}
         contentContainerStyle={styles.listContent}
-        refreshing={isLoading}
+        refreshing={isLoading && !error}
         onRefresh={refresh}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              {error ? `Gagal load data: ${error}` : 'Belum ada motor tersedia'}
-            </Text>
+            {isLoading && !error ? (
+              <ActivityIndicator size="large" color="#ff6f10" />
+            ) : error ? (
+              <>
+                <FontAwesome6 name="triangle-exclamation" size={48} color="#F44336" />
+                <Text style={styles.emptyTitle}>Database Connection Error</Text>
+                <Text style={styles.emptyText}>{error}</Text>
+                <Text style={styles.debugText}>
+                  {`Pastikan table 'motorcycles' sudah dibuat di Supabase dan RLS policies mengizinkan SELECT`}
+                </Text>
+                <Pressable style={styles.retryButton} onPress={refresh}>
+                  <FontAwesome6 name="rotate" size={16} color="#fff" />
+                  <Text style={styles.retryText}>Retry</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <FontAwesome6 name="motorcycle" size={48} color="#ccc" />
+                <Text style={styles.emptyText}>Belum ada motor tersedia</Text>
+              </>
+            )}
           </View>
         }
         scrollEnabled
@@ -153,12 +172,44 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   emptyContainer: {
-    paddingVertical: 24,
+    paddingVertical: 40,
     alignItems: 'center',
+    marginTop: 20,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginTop: 12,
+    marginBottom: 8,
   },
   emptyText: {
     color: '#777',
     fontSize: 14,
     textAlign: 'center',
+    marginBottom: 12,
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    fontStyle: 'italic',
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ff6f10',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 8,
+    marginTop: 8,
+  },
+  retryText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
