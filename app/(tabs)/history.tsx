@@ -14,7 +14,7 @@ export default function HistoryScreen() {
     .filter((b) => b.type === 'interested')
     .reduce(
       (acc, booking) => {
-        const exists = acc.find((m) => m.id === booking.motorcycle.id);
+        const exists = acc.find((m) => m.motorcycle_id === booking.motorcycle.motorcycle_id);
         if (!exists) {
           acc.push(booking.motorcycle);
         }
@@ -23,10 +23,10 @@ export default function HistoryScreen() {
       [] as typeof bookings[0]['motorcycle'][]
     );
 
-  const handleMotorcyclePress = (id: string) => {
+  const handleMotorcyclePress = (motorcycle_id: string) => {
     router.push({
       pathname: '/motorcycle-detail',
-      params: { id },
+      params: { id: motorcycle_id },
     });
   };
 
@@ -67,11 +67,11 @@ export default function HistoryScreen() {
       ) : (
         <FlatList
           data={interestedMotorcycles}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.motorcycle_id}
           renderItem={({ item }) => (
             <MotorcycleCard
               motorcycle={item}
-              onPress={() => handleMotorcyclePress(item.id)}
+              onPress={() => handleMotorcyclePress(item.motorcycle_id)}
             />
           )}
           contentContainerStyle={styles.listContent}

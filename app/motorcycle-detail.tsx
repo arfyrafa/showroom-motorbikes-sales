@@ -15,7 +15,7 @@ export default function MotorcycleDetailScreen() {
   const [isInterested, setIsInterested] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   
-  const motorcycle = motorcycles.find((m) => m.id === id);
+  const motorcycle = motorcycles.find((m) => m.motorcycle_id === id);
   const formattedPrice = motorcycle
     ? motorcycle.price.toLocaleString('id-ID', {
         style: 'currency',
@@ -35,7 +35,7 @@ export default function MotorcycleDetailScreen() {
   useEffect(() => {
     if (motorcycle && bookings) {
       const interested = bookings.find(
-        (b) => b.motorcycle.id === motorcycle.id && b.type === 'interested'
+        (b) => b.motorcycle.motorcycle_id === motorcycle.motorcycle_id && b.type === 'interested'
       );
       setIsInterested(!!interested);
     }

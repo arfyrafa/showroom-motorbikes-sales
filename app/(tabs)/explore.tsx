@@ -27,10 +27,10 @@ export default function TabTwoScreen() {
     );
   }, [motorcycles, searchQuery]);
 
-  const handleMotorcyclePress = (id: string) => {
+  const handleMotorcyclePress = (motorcycle_id: string) => {
     router.push({
       pathname: '/motorcycle-detail',
-      params: { id },
+      params: { id: motorcycle_id },
     });
   };
 
@@ -68,11 +68,11 @@ export default function TabTwoScreen() {
       {/* Motorcycle List */}
       <FlatList
         data={filteredMotorcycles}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.motorcycle_id}
         renderItem={({ item }) => (
           <MotorcycleCard
             motorcycle={item}
-            onPress={() => handleMotorcyclePress(item.id)}
+            onPress={() => handleMotorcyclePress(item.motorcycle_id)}
           />
         )}
         contentContainerStyle={styles.listContent}

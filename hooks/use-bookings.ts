@@ -38,7 +38,7 @@ export function useBookings() {
       try {
         // Check if already interested in this motorcycle
         const existingInterested = bookings.find(
-          (b) => b.motorcycle.id === motorcycle.id && b.type === 'interested'
+          (b) => b.motorcycle.motorcycle_id === motorcycle.motorcycle_id && b.type === 'interested'
         );
 
         if (existingInterested && type === 'interested') {
@@ -46,7 +46,7 @@ export function useBookings() {
         }
 
         const newBooking: BookingRecord = {
-          id: `${motorcycle.id}-${Date.now()}`,
+          id: `${motorcycle.motorcycle_id}-${Date.now()}`,
           motorcycle,
           type,
           timestamp: Date.now(),

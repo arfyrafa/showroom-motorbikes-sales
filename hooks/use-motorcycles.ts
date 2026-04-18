@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useCallback, useEffect, useState } from 'react';
 
 interface RawMotorcycleRow {
-  id: string;
+  motorcycle_id: string;
   title: string;
   price: number;
   location: string | null;
@@ -31,7 +31,7 @@ export interface CreateMotorcycleInput {
 
 function mapRowToMotorcycle(row: RawMotorcycleRow): Motorcycle {
   return {
-    id: row.id,
+    motorcycle_id: row.motorcycle_id,
     title: row.title,
     price: Number(row.price),
     location: row.location ?? 'Unknown location',
@@ -81,7 +81,7 @@ export function useMotorcycles() {
       console.log('🔍 Fetching motorcycles from Supabase...');
       const { data, error: fetchError } = await supabase
         .from('motorcycles')
-        .select('id,title,price,location,image,image_url,rating,year,engine_capacity,mileage,description')
+        .select('motorcycle_id,title,price,location,image,image_url,rating,year,engine_capacity,mileage,description')
         .order('created_at', { ascending: false });
 
       if (fetchError) {
@@ -141,7 +141,7 @@ export function useMotorcycles() {
       if (fullInsert.error) {
         // Fallback to init schema (init_schema.sql)
         const fallbackInsert = await supabase.from('motorcycles').insert({
-          id: `${Date.now()}`,
+          motorcycle_id: `${Date.now()}`,
           title: payload.title,
           price: payload.price,
           location: payload.location,
