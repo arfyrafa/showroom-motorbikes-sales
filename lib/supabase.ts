@@ -42,3 +42,35 @@ async function testConnection() {
 
 // Test after a short delay
 setTimeout(testConnection, 1000);
+
+/**
+ * Upload image to Supabase Storage and save public URL to motorcycle_images table
+ * @param motorcycleId - UUID of the motorcycle
+ * @param file - File object (from input type="file")
+ * @returns public URL of uploaded image
+ */
+export async function uploadMotorcycleImage(motorcycleId: string, file: File) {
+  // 1. Upload ke Supabase Storage
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+  const filePath = `motorcycles/${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('motorcycles')
+    .upload(filePath, file);
+
+  if (uploadError) throw uploadError;
+
+  // 2. Ambil public URL
+  const { data } = supabase.storage.from('motorcycles').getPublicUrl(filePath);
+  const imageUrl = data.publicUrl;
+
+  // 3. Simpan ke tabel motorcycle_images
+  const { error: dbError } = await supabase
+    .from('motorcycle_images')
+    .insert([{ motorcycle_id: motorcycleId, image_url: imageUrl }]);
+
+  if (dbError) throw dbError;
+
+  return imageUrl;
+}

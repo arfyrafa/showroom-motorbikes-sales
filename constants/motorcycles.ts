@@ -1,5 +1,5 @@
 export interface Motorcycle {
-  id: string;
+  motorcycle_id: string;
   title: string;
   price: number;
   location: string;

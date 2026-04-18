@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "showroom-motorbikes-sales",
-    "slug": "showroom-motorbikes-sales",
+    "name": "MotoMarket",
+    "slug": "motomarket",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "showroommotorbikessales",
+    "scheme": "motomarket",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -19,7 +19,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.ar7ishere.motomarket"
     },
     "web": {
       "output": "static",
@@ -43,6 +44,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8d3e833a-0964-491d-8b3a-6969159bdd45"
+      }
     }
   }
 }

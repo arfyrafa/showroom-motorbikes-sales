@@ -1,3 +1,4 @@
+import BannerPromosi from '@/components/banner-promosi';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -9,6 +10,7 @@ export default function SplashScreen() {
       <View style={styles.glow} />
 
       <View style={styles.card}>
+        <BannerPromosi />
         <View style={styles.logoWrap}>
           <Image source={require('@/assets/images/motosales.jpeg')} style={styles.logo} contentFit="contain" />
         </View>
