@@ -9,6 +9,7 @@ interface MotorcycleCardProps {
 }
 
 export function MotorcycleCard({ motorcycle, onPress }: MotorcycleCardProps) {
+  const isSoldOut = motorcycle.listingStatus === 'sold_out';
   const formattedPrice = motorcycle.price.toLocaleString('id-ID', {
     style: 'currency',
     currency: 'IDR',
@@ -16,13 +17,18 @@ export function MotorcycleCard({ motorcycle, onPress }: MotorcycleCardProps) {
   });
 
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <Pressable style={[styles.card, isSoldOut && styles.cardSoldOut]} onPress={onPress}>
       <View style={styles.imageContainer}>
         <Image
-          source={{uri: motorcycle.image}}
-          style={styles.image}
+          source={{ uri: motorcycle.image }}
+          style={[styles.image, isSoldOut && styles.imageDimmed]}
           contentFit="cover"
         />
+        {isSoldOut ? (
+          <View style={styles.soldOutBadge}>
+            <Text style={styles.soldOutBadgeText}>SOLD OUT</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.content}>
@@ -30,18 +36,19 @@ export function MotorcycleCard({ motorcycle, onPress }: MotorcycleCardProps) {
           {motorcycle.title}
         </Text>
 
-        <View style={styles.ratingContainer}>
-          <FontAwesome6 name="star" size={12} color="#ff6f10" />
-          <Text style={styles.ratingText}>{motorcycle.rating}</Text>
-        </View>
+        {typeof motorcycle.rating === 'number' ? (
+          <View style={styles.ratingContainer}>
+            <FontAwesome6 name="star" size={12} color="#ff6f10" />
+            <Text style={styles.ratingText}>{motorcycle.rating}</Text>
+          </View>
+        ) : null}
 
         <View style={styles.footerContainer}>
           <View>
             <Text style={styles.price}>{formattedPrice}</Text>
-            <View style={styles.locationRow}>
-              <FontAwesome6 name="location-dot" size={12} color="#666" />
-              <Text style={styles.location}>{motorcycle.location}</Text>
-            </View>
+            {motorcycle.engineCapacity && motorcycle.engineCapacity !== '-' ? (
+              <Text style={styles.location}>{motorcycle.engineCapacity}</Text>
+            ) : null}
           </View>
         </View>
       </View>
@@ -61,14 +68,36 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
   },
+  cardSoldOut: {
+    opacity: 0.92,
+  },
   imageContainer: {
     width: '100%',
     height: 200,
     backgroundColor: '#f0f0f0',
+    position: 'relative',
   },
   image: {
     width: '100%',
     height: '100%',
+  },
+  imageDimmed: {
+    opacity: 0.55,
+  },
+  soldOutBadge: {
+    position: 'absolute',
+    left: 10,
+    bottom: 10,
+    backgroundColor: 'rgba(0,0,0,0.78)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  soldOutBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
   },
   content: {
     padding: 12,

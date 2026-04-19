@@ -33,16 +33,16 @@ export function useBookings() {
     loadBookings();
   }, [loadBookings]);
 
-  const addBooking = useCallback(
-    async (motorcycle: Motorcycle, type: 'view' | 'interested' = 'view') => {
-      try {
-        // Check if already interested in this motorcycle
-        const existingInterested = bookings.find(
+  const addBooking = useCallback(async (motorcycle: Motorcycle, type: 'view' | 'interested' = 'view') => {
+    try {
+      let next: BookingRecord[] | null = null;
+      setBookings((prev) => {
+        const existingInterested = prev.find(
           (b) => b.motorcycle.motorcycle_id === motorcycle.motorcycle_id && b.type === 'interested'
         );
 
         if (existingInterested && type === 'interested') {
-          return; // Already interested
+          return prev;
         }
 
         const newBooking: BookingRecord = {
@@ -52,28 +52,30 @@ export function useBookings() {
           timestamp: Date.now(),
         };
 
-        const updated = [newBooking, ...bookings];
-        setBookings(updated);
-        await AsyncStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(updated));
-      } catch (error) {
-        console.error('Error adding booking:', error);
-      }
-    },
-    [bookings]
-  );
+        next = [newBooking, ...prev];
+        return next;
+      });
 
-  const removeBooking = useCallback(
-    async (bookingId: string) => {
-      try {
-        const updated = bookings.filter((b) => b.id !== bookingId);
-        setBookings(updated);
-        await AsyncStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(updated));
-      } catch (error) {
-        console.error('Error removing booking:', error);
+      if (next) {
+        await AsyncStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(next));
       }
-    },
-    [bookings]
-  );
+    } catch (error) {
+      console.error('Error adding booking:', error);
+    }
+  }, []);
+
+  const removeBooking = useCallback(async (bookingId: string) => {
+    try {
+      let next: BookingRecord[] = [];
+      setBookings((prev) => {
+        next = prev.filter((b) => b.id !== bookingId);
+        return next;
+      });
+      await AsyncStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(next));
+    } catch (error) {
+      console.error('Error removing booking:', error);
+    }
+  }, []);
 
   const clearBookings = useCallback(async () => {
     try {

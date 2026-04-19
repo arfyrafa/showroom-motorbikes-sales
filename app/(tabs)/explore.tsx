@@ -88,7 +88,7 @@ export default function TabTwoScreen() {
                 <Text style={styles.emptyTitle}>Database Connection Error</Text>
                 <Text style={styles.emptyText}>{error}</Text>
                 <Text style={styles.debugText}>
-                  {`Pastikan table 'motorcycles' sudah dibuat di Supabase dan RLS policies mengizinkan SELECT`}
+                  {`Pastikan tabel 'motorcycles' ada di Supabase dan RLS mengizinkan SELECT; bucket Storage 'motorcycles' untuk upload gambar.`}
                 </Text>
                 <Pressable style={styles.retryButton} onPress={refresh}>
                   <FontAwesome6 name="rotate" size={16} color="#fff" />

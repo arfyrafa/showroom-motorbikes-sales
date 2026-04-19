@@ -1,7 +1,7 @@
 import { FontAwesome6 } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,13 +9,16 @@ import { useBookings } from '@/hooks/use-bookings';
 import { useMotorcycles } from '@/hooks/use-motorcycles';
 
 export default function MotorcycleDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const params = useLocalSearchParams<{ id?: string | string[] }>();
+  const id = typeof params.id === 'string' ? params.id : params.id?.[0];
   const { addBooking, bookings } = useBookings();
   const { motorcycles, isLoading } = useMotorcycles();
   const [isInterested, setIsInterested] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  
-  const motorcycle = motorcycles.find((m) => m.motorcycle_id === id);
+  const lastRecordedViewIdRef = useRef<string | null>(null);
+
+  const motorcycle = id ? motorcycles.find((m) => m.motorcycle_id === id) : undefined;
+  const isSoldOut = motorcycle?.listingStatus === 'sold_out';
   const formattedPrice = motorcycle
     ? motorcycle.price.toLocaleString('id-ID', {
         style: 'currency',
@@ -24,11 +27,12 @@ export default function MotorcycleDetailScreen() {
       })
     : '';
 
-  // Track view and check if interested
+  // Track view once per product open (avoids loop: addBooking used to depend on bookings → new ref every update)
   useEffect(() => {
-    if (id && typeof id === 'string' && motorcycle) {
-      addBooking(motorcycle, 'view');
-    }
+    if (!id || !motorcycle) return;
+    if (lastRecordedViewIdRef.current === id) return;
+    lastRecordedViewIdRef.current = id;
+    void addBooking(motorcycle, 'view');
   }, [id, motorcycle, addBooking]);
 
   // Check if user is already interested in this motorcycle
@@ -42,7 +46,7 @@ export default function MotorcycleDetailScreen() {
   }, [motorcycle, bookings]);
 
   const handleInterestedPress = async () => {
-    if (id && typeof id === 'string' && motorcycle) {
+    if (id && motorcycle && !isSoldOut) {
       await addBooking(motorcycle, 'interested');
       setIsInterested(true);
       setShowSuccessMessage(true);
@@ -81,9 +85,14 @@ export default function MotorcycleDetailScreen() {
         <View style={styles.imageContainer}>
           <Image
             source={{ uri: motorcycle.image }}
-            style={styles.image}
+            style={[styles.image, isSoldOut && styles.imageDimmed]}
             contentFit="cover"
           />
+          {isSoldOut ? (
+            <View style={styles.soldOutRibbon}>
+              <Text style={styles.soldOutRibbonText}>Sold out</Text>
+            </View>
+          ) : null}
         </View>
 
         {/* Content */}
@@ -92,11 +101,13 @@ export default function MotorcycleDetailScreen() {
           <Text style={styles.title}>{motorcycle.title}</Text>
           <Text style={styles.price}>{formattedPrice}</Text>
 
-          {/* Location */}
-          <View style={styles.locationRow}>
-            <FontAwesome6 name="location-dot" size={14} color="#ff6f10" />
-            <Text style={styles.location}>{motorcycle.location}</Text>
-          </View>
+          {/* Brand */}
+          {motorcycle.engineCapacity && motorcycle.engineCapacity !== '-' ? (
+            <View style={styles.locationRow}>
+              <FontAwesome6 name="motorcycle" size={14} color="#ff6f10" />
+              <Text style={styles.location}>{motorcycle.engineCapacity}</Text>
+            </View>
+          ) : null}
 
           {/* Rating */}
           {motorcycle.rating && (
@@ -115,31 +126,6 @@ export default function MotorcycleDetailScreen() {
             </View>
           )}
 
-          {/* Specifications */}
-          <View style={styles.specsContainer}>
-            <Text style={styles.specsTitle}>Specifications</Text>
-
-            <View style={styles.specRow}>
-              <View style={styles.specItem}>
-                <FontAwesome6 name="calendar" size={18} color="#ff6f10" />
-                <Text style={styles.specLabel}>Year</Text>
-                <Text style={styles.specValue}>{motorcycle.year}</Text>
-              </View>
-
-              <View style={styles.specItem}>
-                <FontAwesome6 name="engine" size={18} color="#ff6f10" />
-                <Text style={styles.specLabel}>Engine Capacity</Text>
-                <Text style={styles.specValue}>{motorcycle.engineCapacity}</Text>
-              </View>
-
-              <View style={styles.specItem}>
-                <FontAwesome6 name="road" size={18} color="#ff6f10" />
-                <Text style={styles.specLabel}>Mileage</Text>
-                <Text style={styles.specValue}>{motorcycle.mileage}</Text>
-              </View>
-            </View>
-          </View>
-
           {/* Description */}
           {motorcycle.description && (
             <View style={styles.descriptionContainer}>
@@ -147,14 +133,24 @@ export default function MotorcycleDetailScreen() {
             </View>
           )}
 
+          {isSoldOut ? (
+            <View style={styles.soldOutNotice}>
+              <FontAwesome6 name="circle-info" size={16} color="#666" />
+              <Text style={styles.soldOutNoticeText}>
+                Unit ini sudah terjual / tidak tersedia. Kamu tetap bisa melihat detailnya.
+              </Text>
+            </View>
+          ) : null}
+
           {/* I'm Interested Button */}
           <Pressable
             style={[
               styles.interestedButton,
               isInterested && styles.interestedButtonActive,
+              isSoldOut && styles.interestedButtonDisabled,
             ]}
             onPress={handleInterestedPress}
-            disabled={isInterested}
+            disabled={isInterested || isSoldOut}
           >
             <FontAwesome6
               name={isInterested ? 'check' : 'heart'}
@@ -163,7 +159,11 @@ export default function MotorcycleDetailScreen() {
               style={styles.buttonIcon}
             />
             <Text style={styles.interestedText}>
-              {isInterested ? 'Added to Bookings' : "I'm Interested"}
+              {isSoldOut
+                ? 'Tidak tersedia'
+                : isInterested
+                  ? 'Added to Bookings'
+                  : "I'm Interested"}
             </Text>
           </Pressable>
 
@@ -210,10 +210,44 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 300,
     backgroundColor: '#f0f0f0',
+    position: 'relative',
   },
   image: {
     width: '100%',
     height: '100%',
+  },
+  imageDimmed: {
+    opacity: 0.55,
+  },
+  soldOutRibbon: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  soldOutRibbonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  soldOutNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
+  soldOutNoticeText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#555',
+    lineHeight: 18,
   },
   content: {
     paddingHorizontal: 16,
@@ -307,6 +341,9 @@ const styles = StyleSheet.create({
   interestedButtonActive: {
     backgroundColor: '#4CAF50',
     opacity: 0.8,
+  },
+  interestedButtonDisabled: {
+    backgroundColor: '#bdbdbd',
   },
   buttonIcon: {
     marginTop: 2,

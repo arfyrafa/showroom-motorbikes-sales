@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -16,20 +17,24 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useMotorcycles } from '@/hooks/use-motorcycles';
 import { useAuth } from '@/lib/auth-context';
+import type { MotorcycleListingStatus } from '@/constants/motorcycles';
 
 export default function AdminMotorcycleScreen() {
-  const { createMotorcycleByAdmin } = useMotorcycles();
+  const {
+    createMotorcycleByAdmin,
+    motorcycles,
+    isLoading: catalogLoading,
+    updateMotorcycleListingStatus,
+  } = useMotorcycles();
   const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
-  const [location, setLocation] = useState('');
-  const [year, setYear] = useState(`${new Date().getFullYear()}`);
-  const [engineCapacity, setEngineCapacity] = useState('');
-  const [mileage, setMileage] = useState('');
+  const [brand, setBrand] = useState('');
   const [description, setDescription] = useState('');
   const [imageUri, setImageUri] = useState('');
   const [imageType, setImageType] = useState<string | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [updatingListingId, setUpdatingListingId] = useState<string | null>(null);
 
   // Gate: hanya admin yang bisa akses
   useEffect(() => {
@@ -59,21 +64,15 @@ export default function AdminMotorcycleScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!title || !price || !location || !year || !engineCapacity || !mileage || !imageUri) {
+    if (!title || !price || !imageUri) {
       Alert.alert('Data belum lengkap', 'Semua field wajib diisi termasuk gambar motor.');
       return;
     }
 
     const parsedPrice = Number(price.replace(/[^0-9.]/g, ''));
-    const parsedYear = Number(year);
 
     if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
       Alert.alert('Harga tidak valid', 'Masukkan angka harga yang benar.');
-      return;
-    }
-
-    if (!Number.isFinite(parsedYear) || parsedYear < 1900 || parsedYear > 2100) {
-      Alert.alert('Tahun tidak valid', 'Masukkan tahun antara 1900 sampai 2100.');
       return;
     }
 
@@ -82,10 +81,7 @@ export default function AdminMotorcycleScreen() {
       await createMotorcycleByAdmin({
         title,
         price: parsedPrice,
-        location,
-        year: parsedYear,
-        engineCapacity,
-        mileage,
+        brand: brand || undefined,
         description,
         imageUri,
         mimeType: imageType,
@@ -95,9 +91,34 @@ export default function AdminMotorcycleScreen() {
         { text: 'OK', onPress: () => router.replace('/(tabs)/explore') },
       ]);
     } catch (error: any) {
-      Alert.alert('Gagal simpan', error?.message ?? 'Terjadi kesalahan saat upload motor.');
+      const message = error?.message ?? 'Terjadi kesalahan saat upload motor.';
+      const raw = (() => {
+        try {
+          return JSON.stringify(error);
+        } catch {
+          return String(error);
+        }
+      })();
+      const detail = `${message}\n\nRaw: ${raw}`.slice(0, 1600);
+      console.error('❌ Admin create motorcycle error:', error);
+      Alert.alert('Gagal simpan', detail);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleListingStatus = async (
+    motorcycleId: string,
+    status: MotorcycleListingStatus
+  ) => {
+    setUpdatingListingId(motorcycleId);
+    try {
+      await updateMotorcycleListingStatus(motorcycleId, status);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      Alert.alert('Gagal memperbarui status', message);
+    } finally {
+      setUpdatingListingId(null);
     }
   };
 
@@ -131,40 +152,12 @@ export default function AdminMotorcycleScreen() {
           placeholderTextColor="#999"
         />
 
-        <Text style={styles.label}>Lokasi</Text>
+        <Text style={styles.label}>Brand (opsional)</Text>
         <TextInput
           style={styles.input}
-          value={location}
-          onChangeText={setLocation}
-          placeholder="Contoh: Jakarta Selatan"
-          placeholderTextColor="#999"
-        />
-
-        <Text style={styles.label}>Tahun</Text>
-        <TextInput
-          style={styles.input}
-          value={year}
-          onChangeText={setYear}
-          keyboardType="numeric"
-          placeholder="Contoh: 2024"
-          placeholderTextColor="#999"
-        />
-
-        <Text style={styles.label}>Kapasitas Mesin</Text>
-        <TextInput
-          style={styles.input}
-          value={engineCapacity}
-          onChangeText={setEngineCapacity}
-          placeholder="Contoh: 155cc"
-          placeholderTextColor="#999"
-        />
-
-        <Text style={styles.label}>Mileage</Text>
-        <TextInput
-          style={styles.input}
-          value={mileage}
-          onChangeText={setMileage}
-          placeholder="Contoh: 1.200 km"
+          value={brand}
+          onChangeText={setBrand}
+          placeholder="Contoh: Yamaha"
           placeholderTextColor="#999"
         />
 
@@ -197,6 +190,76 @@ export default function AdminMotorcycleScreen() {
             {isSubmitting ? 'Menyimpan...' : 'Simpan Motor'}
           </Text>
         </Pressable>
+
+        <Text style={styles.sectionHeading}>Kelola ketersediaan</Text>
+        <Text style={styles.sectionHint}>
+          Tandai motor yang masih dijual (Available) atau sudah tidak dijual (Sold out).
+        </Text>
+
+        {catalogLoading ? (
+          <ActivityIndicator style={styles.catalogSpinner} color="#ff6f10" />
+        ) : motorcycles.length === 0 ? (
+          <Text style={styles.emptyCatalog}>Belum ada motor di katalog.</Text>
+        ) : (
+          motorcycles.map((m) => {
+            const current = m.listingStatus === 'sold_out' ? 'sold_out' : 'available';
+            const busy = updatingListingId === m.motorcycle_id;
+            return (
+              <View key={m.motorcycle_id} style={styles.manageCard}>
+                <Text style={styles.manageTitle} numberOfLines={2}>
+                  {m.title}
+                </Text>
+                <Text style={styles.manageMeta}>
+                  Status:{' '}
+                  <Text style={styles.manageMetaStrong}>
+                    {current === 'sold_out' ? 'Sold out' : 'Tersedia'}
+                  </Text>
+                </Text>
+                <View style={styles.statusRow}>
+                  <Pressable
+                    style={[
+                      styles.statusChip,
+                      current === 'available' && styles.statusChipActive,
+                      busy && styles.statusChipDisabled,
+                    ]}
+                    onPress={() => handleListingStatus(m.motorcycle_id, 'available')}
+                    disabled={busy || current === 'available'}
+                  >
+                    <Text
+                      style={[
+                        styles.statusChipText,
+                        current === 'available' && styles.statusChipTextActive,
+                      ]}
+                    >
+                      Available
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.statusChip,
+                      current === 'sold_out' && styles.statusChipSoldOut,
+                      busy && styles.statusChipDisabled,
+                    ]}
+                    onPress={() => handleListingStatus(m.motorcycle_id, 'sold_out')}
+                    disabled={busy || current === 'sold_out'}
+                  >
+                    <Text
+                      style={[
+                        styles.statusChipText,
+                        current === 'sold_out' && styles.statusChipTextActive,
+                      ]}
+                    >
+                      Sold out
+                    </Text>
+                  </Pressable>
+                </View>
+                {busy ? (
+                  <ActivityIndicator style={styles.rowSpinner} size="small" color="#ff6f10" />
+                ) : null}
+              </View>
+            );
+          })
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -291,5 +354,84 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '800',
     fontSize: 15,
+  },
+  sectionHeading: {
+    marginTop: 28,
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1a1a1a',
+  },
+  sectionHint: {
+    marginTop: 6,
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  catalogSpinner: {
+    marginVertical: 20,
+  },
+  emptyCatalog: {
+    fontSize: 14,
+    color: '#888',
+    marginVertical: 12,
+  },
+  manageCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ececec',
+    padding: 14,
+    marginBottom: 12,
+  },
+  manageTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111',
+    marginBottom: 6,
+  },
+  manageMeta: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 10,
+  },
+  manageMetaStrong: {
+    fontWeight: '800',
+    color: '#333',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  statusChip: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    alignItems: 'center',
+    backgroundColor: '#fafafa',
+  },
+  statusChipActive: {
+    borderColor: '#1f7a4d',
+    backgroundColor: '#e8f5e9',
+  },
+  statusChipSoldOut: {
+    borderColor: '#c62828',
+    backgroundColor: '#ffebee',
+  },
+  statusChipDisabled: {
+    opacity: 0.55,
+  },
+  statusChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#555',
+  },
+  statusChipTextActive: {
+    color: '#1a1a1a',
+  },
+  rowSpinner: {
+    marginTop: 8,
   },
 });

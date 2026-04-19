@@ -1,201 +1,121 @@
--- MotoMarket Supabase Schema
--- Run this file in Supabase SQL Editor.
+-- =============================================================================
+-- Showroom Motorbikes — Supabase schema (database + storage)
+-- =============================================================================
+-- Mapping ke kode project:
+--   • motorcycles (listing_status) + motorcycle_images + bucket Storage → hooks/use-motorcycles.ts
+--   • motorcycle_bookings                         → hooks/use-bookings.ts (saat ini AsyncStorage)
+--   • profiles + user_preferences                → hooks/use-user-settings.ts (saat ini AsyncStorage)
+--   • auth.users + trigger                        → lib/auth-context.tsx (mock; siap pakai Supabase Auth)
+--
+-- Database (public) dan Storage (storage.*) boleh satu file; urutan: tabel → RLS → bucket.
+-- Jalankan di: Supabase Dashboard → SQL → New query → paste → Run.
+-- =============================================================================
 
-begin;
+-- -----------------------------------------------------------------------------
+-- 1) Katalog motor + gambar
+-- -----------------------------------------------------------------------------
 
-create extension if not exists pgcrypto;
-
--- ==============================
--- Enums
--- ==============================
-do $$ begin
-  create type public.app_role as enum ('customer', 'admin', 'superadmin');
-exception
-  when duplicate_object then null;
-end $$;
-
-do $$ begin
-  create type public.motorcycle_status as enum ('available', 'pending', 'sold');
-exception
-  when duplicate_object then null;
-end $$;
-
-do $$ begin
-  create type public.booking_type as enum ('view', 'interested');
-exception
-  when duplicate_object then null;
-end $$;
-
-do $$ begin
-  create type public.inquiry_status as enum ('pending', 'replied', 'closed');
-exception
-  when duplicate_object then null;
-end $$;
-
--- ==============================
--- Core Tables
--- ==============================
-create table if not exists public.showrooms (
-  id uuid primary key default gen_random_uuid(),
+create table if not exists public.motorcycles (
+  motorcycle_id uuid primary key default gen_random_uuid(),
   name text not null,
-  city text,
-  address text,
-  phone text,
-  email text,
+  price numeric not null check (price >= 0),
+  brand text,
   description text,
-  logo_url text,
+  stock integer not null default 1 check (stock >= 0),
+  listing_status text not null default 'available',
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  constraint motorcycles_listing_status_check check (listing_status in ('available', 'sold_out'))
 );
+
+-- Proyek yang sudah punya tabel lama tanpa listing_status:
+alter table public.motorcycles
+  add column if not exists listing_status text not null default 'available';
+
+alter table public.motorcycles
+  drop constraint if exists motorcycles_listing_status_check;
+
+alter table public.motorcycles
+  add constraint motorcycles_listing_status_check check (listing_status in ('available', 'sold_out'));
+
+create table if not exists public.motorcycle_images (
+  image_id uuid primary key default gen_random_uuid(),
+  motorcycle_id uuid not null references public.motorcycles (motorcycle_id) on delete cascade,
+  image_url text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists motorcycle_images_motorcycle_id_idx
+  on public.motorcycle_images (motorcycle_id);
+
+comment on table public.motorcycles is 'Katalog motor; dipakai hook use-motorcycles (select + insert admin).';
+comment on table public.motorcycle_images is 'URL gambar (biasanya public URL Supabase Storage).';
+
+-- -----------------------------------------------------------------------------
+-- 2) Riwayat minat / lihat motor (setara BookingRecord di use-bookings.ts)
+--     Kolom client_session_id = UUID perangkat (nanti dari app) bila belum login.
+-- -----------------------------------------------------------------------------
+
+create table if not exists public.motorcycle_bookings (
+  booking_id uuid primary key default gen_random_uuid(),
+  motorcycle_id uuid not null references public.motorcycles (motorcycle_id) on delete cascade,
+  interaction_type text not null check (interaction_type in ('view', 'interested')),
+  client_session_id text,
+  user_id uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists motorcycle_bookings_motorcycle_id_idx
+  on public.motorcycle_bookings (motorcycle_id);
+
+create index if not exists motorcycle_bookings_user_id_idx
+  on public.motorcycle_bookings (user_id);
+
+create index if not exists motorcycle_bookings_created_at_idx
+  on public.motorcycle_bookings (created_at desc);
+
+comment on table public.motorcycle_bookings is 'Minat/lihat motor; app saat ini pakai AsyncStorage — tabel ini untuk sync ke DB nanti.';
+
+-- -----------------------------------------------------------------------------
+-- 3) Profil & preferensi (setara use-user-settings.ts) — per user Supabase Auth
+-- -----------------------------------------------------------------------------
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   first_name text,
   last_name text,
-  phone text,
-  role public.app_role not null default 'customer',
-  showroom_id uuid references public.showrooms (id) on delete set null,
-  created_at timestamptz not null default now(),
+  email text,
+  mobile text,
   updated_at timestamptz not null default now()
 );
 
-create table if not exists public.motorcycles (
-  id uuid primary key default gen_random_uuid(),
-  title text not null,
-  brand text,
-  model text,
-  year int,
-  price numeric(12,2) not null,
-  currency text not null default 'IDR' check (currency in ('USD', 'EUR', 'IDR')),
-  location text,
-  engine_capacity text,
-  mileage text,
-  description text,
-  image_url text,
-  image_path text,
-  status public.motorcycle_status not null default 'available',
-  rating numeric(2,1),
-  views_count int not null default 0,
-  showroom_id uuid references public.showrooms (id) on delete set null,
-  created_by uuid references public.profiles (id) on delete set null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists public.motorcycle_images (
-  id uuid primary key default gen_random_uuid(),
-  motorcycle_id uuid not null references public.motorcycles (id) on delete cascade,
-  image_url text not null,
-  image_path text not null,
-  sort_order int not null default 0,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists public.bookings (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references public.profiles (id) on delete cascade,
-  motorcycle_id uuid not null references public.motorcycles (id) on delete cascade,
-  type public.booking_type not null,
-  notes text,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists public.inquiries (
-  id uuid primary key default gen_random_uuid(),
-  customer_id uuid not null references public.profiles (id) on delete cascade,
-  motorcycle_id uuid not null references public.motorcycles (id) on delete cascade,
-  showroom_id uuid references public.showrooms (id) on delete set null,
-  message text,
-  status public.inquiry_status not null default 'pending',
-  replied_by uuid references public.profiles (id) on delete set null,
-  replied_at timestamptz,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists public.user_settings (
-  user_id uuid primary key references public.profiles (id) on delete cascade,
+create table if not exists public.user_preferences (
+  user_id uuid primary key references auth.users (id) on delete cascade,
   currency text not null default 'IDR' check (currency in ('USD', 'EUR', 'IDR')),
   theme text not null default 'light' check (theme in ('light', 'dark')),
   updated_at timestamptz not null default now()
 );
 
--- ==============================
--- Indexes
--- ==============================
-create index if not exists idx_profiles_role on public.profiles (role);
-create index if not exists idx_profiles_showroom_id on public.profiles (showroom_id);
+comment on table public.profiles is 'Profil pengguna; sinkron dengan UserProfile setelah pakai Supabase Auth.';
+comment on table public.user_preferences is 'Preferensi (mata uang, tema); sinkron dengan UserPreferences.';
 
-create index if not exists idx_motorcycles_showroom_id on public.motorcycles (showroom_id);
-create index if not exists idx_motorcycles_created_by on public.motorcycles (created_by);
-create index if not exists idx_motorcycles_status on public.motorcycles (status);
-create index if not exists idx_motorcycles_price on public.motorcycles (price);
-create index if not exists idx_motorcycles_created_at on public.motorcycles (created_at desc);
+-- -----------------------------------------------------------------------------
+-- 4) Trigger: saat user baru daftar lewat Supabase Auth, buat baris profil + preferensi
+-- -----------------------------------------------------------------------------
 
-create index if not exists idx_motorcycle_images_motorcycle_id on public.motorcycle_images (motorcycle_id);
-
-create index if not exists idx_bookings_user_id on public.bookings (user_id);
-create index if not exists idx_bookings_motorcycle_id on public.bookings (motorcycle_id);
-create index if not exists idx_bookings_type on public.bookings (type);
-create unique index if not exists ux_bookings_user_interested
-  on public.bookings (user_id, motorcycle_id)
-  where type = 'interested';
-
-create index if not exists idx_inquiries_customer_id on public.inquiries (customer_id);
-create index if not exists idx_inquiries_showroom_id on public.inquiries (showroom_id);
-create index if not exists idx_inquiries_status on public.inquiries (status);
-
--- ==============================
--- Utility Functions
--- ==============================
-create or replace function public.set_updated_at()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
-
-create or replace function public.get_my_role()
-returns public.app_role
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select coalesce((select role from public.profiles where id = auth.uid()), 'customer'::public.app_role);
-$$;
-
-create or replace function public.get_my_showroom_id()
-returns uuid
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select showroom_id from public.profiles where id = auth.uid();
-$$;
-
--- Auto-create profile and settings when new auth user is created.
-create or replace function public.handle_new_auth_user()
+create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, first_name, last_name, role)
-  values (
-    new.id,
-    coalesce(new.raw_user_meta_data ->> 'first_name', ''),
-    coalesce(new.raw_user_meta_data ->> 'last_name', ''),
-    'customer'
-  )
-  on conflict (id) do nothing;
+  insert into public.profiles (id, email)
+  values (new.id, new.email)
+  on conflict (id) do update
+    set email = excluded.email,
+        updated_at = now();
 
-  insert into public.user_settings (user_id)
+  insert into public.user_preferences (user_id)
   values (new.id)
   on conflict (user_id) do nothing;
 
@@ -203,269 +123,156 @@ begin
 end;
 $$;
 
--- ==============================
--- Triggers
--- ==============================
-drop trigger if exists trg_showrooms_updated_at on public.showrooms;
-create trigger trg_showrooms_updated_at
-before update on public.showrooms
-for each row execute function public.set_updated_at();
-
-drop trigger if exists trg_profiles_updated_at on public.profiles;
-create trigger trg_profiles_updated_at
-before update on public.profiles
-for each row execute function public.set_updated_at();
-
-drop trigger if exists trg_motorcycles_updated_at on public.motorcycles;
-create trigger trg_motorcycles_updated_at
-before update on public.motorcycles
-for each row execute function public.set_updated_at();
-
-drop trigger if exists trg_inquiries_updated_at on public.inquiries;
-create trigger trg_inquiries_updated_at
-before update on public.inquiries
-for each row execute function public.set_updated_at();
-
-drop trigger if exists trg_user_settings_updated_at on public.user_settings;
-create trigger trg_user_settings_updated_at
-before update on public.user_settings
-for each row execute function public.set_updated_at();
-
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
-after insert on auth.users
-for each row execute function public.handle_new_auth_user();
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
 
--- ==============================
--- Row Level Security
--- ==============================
-alter table public.showrooms enable row level security;
-alter table public.profiles enable row level security;
+-- -----------------------------------------------------------------------------
+-- 5) Row Level Security — public
+-- -----------------------------------------------------------------------------
+
 alter table public.motorcycles enable row level security;
 alter table public.motorcycle_images enable row level security;
-alter table public.bookings enable row level security;
-alter table public.inquiries enable row level security;
-alter table public.user_settings enable row level security;
+alter table public.motorcycle_bookings enable row level security;
+alter table public.profiles enable row level security;
+alter table public.user_preferences enable row level security;
 
--- Showrooms
-drop policy if exists "showrooms_select_public" on public.showrooms;
-create policy "showrooms_select_public"
-  on public.showrooms for select
-  using (true);
+-- --- motorcycles + images (app pakai anon key untuk katalog + admin upload) ---
 
-drop policy if exists "showrooms_admin_manage" on public.showrooms;
-create policy "showrooms_admin_manage"
-  on public.showrooms for all
-  using (public.get_my_role() = 'superadmin')
-  with check (public.get_my_role() = 'superadmin');
-
--- Profiles
-drop policy if exists "profiles_select_self" on public.profiles;
-create policy "profiles_select_self"
-  on public.profiles for select
-  using (id = auth.uid());
-
-drop policy if exists "profiles_select_admin" on public.profiles;
-create policy "profiles_select_admin"
-  on public.profiles for select
-  using (public.get_my_role() in ('admin', 'superadmin'));
-
-drop policy if exists "profiles_update_self" on public.profiles;
-create policy "profiles_update_self"
-  on public.profiles for update
-  using (id = auth.uid())
-  with check (id = auth.uid());
-
-drop policy if exists "profiles_superadmin_manage" on public.profiles;
-create policy "profiles_superadmin_manage"
-  on public.profiles for all
-  using (public.get_my_role() = 'superadmin')
-  with check (public.get_my_role() = 'superadmin');
-
--- Motorcycles
 drop policy if exists "motorcycles_select_public" on public.motorcycles;
 create policy "motorcycles_select_public"
-  on public.motorcycles for select
+  on public.motorcycles
+  for select
+  to anon, authenticated
   using (true);
 
-drop policy if exists "motorcycles_admin_insert" on public.motorcycles;
-create policy "motorcycles_admin_insert"
-  on public.motorcycles for insert
-  with check (
-    public.get_my_role() in ('admin', 'superadmin')
-    and created_by = auth.uid()
-  );
+drop policy if exists "motorcycles_insert_public" on public.motorcycles;
+create policy "motorcycles_insert_public"
+  on public.motorcycles
+  for insert
+  to anon, authenticated
+  with check (true);
 
-drop policy if exists "motorcycles_admin_update_own" on public.motorcycles;
-create policy "motorcycles_admin_update_own"
-  on public.motorcycles for update
-  using (
-    (public.get_my_role() = 'admin' and created_by = auth.uid())
-    or public.get_my_role() = 'superadmin'
-  )
-  with check (
-    (public.get_my_role() = 'admin' and created_by = auth.uid())
-    or public.get_my_role() = 'superadmin'
-  );
+drop policy if exists "motorcycles_update_public" on public.motorcycles;
+create policy "motorcycles_update_public"
+  on public.motorcycles
+  for update
+  to anon, authenticated
+  using (true)
+  with check (true);
 
-drop policy if exists "motorcycles_admin_delete_own" on public.motorcycles;
-create policy "motorcycles_admin_delete_own"
-  on public.motorcycles for delete
-  using (
-    (public.get_my_role() = 'admin' and created_by = auth.uid())
-    or public.get_my_role() = 'superadmin'
-  );
-
--- Motorcycle images
 drop policy if exists "motorcycle_images_select_public" on public.motorcycle_images;
 create policy "motorcycle_images_select_public"
-  on public.motorcycle_images for select
+  on public.motorcycle_images
+  for select
+  to anon, authenticated
   using (true);
 
-drop policy if exists "motorcycle_images_admin_manage" on public.motorcycle_images;
-create policy "motorcycle_images_admin_manage"
-  on public.motorcycle_images for all
-  using (
-    public.get_my_role() = 'superadmin'
-    or exists (
-      select 1
-      from public.motorcycles m
-      where m.id = motorcycle_id
-        and m.created_by = auth.uid()
-        and public.get_my_role() = 'admin'
-    )
-  )
-  with check (
-    public.get_my_role() = 'superadmin'
-    or exists (
-      select 1
-      from public.motorcycles m
-      where m.id = motorcycle_id
-        and m.created_by = auth.uid()
-        and public.get_my_role() = 'admin'
-    )
-  );
+drop policy if exists "motorcycle_images_insert_public" on public.motorcycle_images;
+create policy "motorcycle_images_insert_public"
+  on public.motorcycle_images
+  for insert
+  to anon, authenticated
+  with check (true);
 
--- Bookings (customer history)
-drop policy if exists "bookings_select_own" on public.bookings;
-create policy "bookings_select_own"
-  on public.bookings for select
-  using (user_id = auth.uid());
+-- --- bookings: anon bisa catat event (setara perilaku publik); perketat saat production ---
 
-drop policy if exists "bookings_insert_own" on public.bookings;
-create policy "bookings_insert_own"
-  on public.bookings for insert
-  with check (user_id = auth.uid());
+drop policy if exists "motorcycle_bookings_select_public" on public.motorcycle_bookings;
+create policy "motorcycle_bookings_select_public"
+  on public.motorcycle_bookings
+  for select
+  to anon, authenticated
+  using (true);
 
-drop policy if exists "bookings_delete_own" on public.bookings;
-create policy "bookings_delete_own"
-  on public.bookings for delete
-  using (user_id = auth.uid());
+drop policy if exists "motorcycle_bookings_insert_public" on public.motorcycle_bookings;
+create policy "motorcycle_bookings_insert_public"
+  on public.motorcycle_bookings
+  for insert
+  to anon, authenticated
+  with check (true);
 
--- Inquiries
-drop policy if exists "inquiries_insert_customer" on public.inquiries;
-create policy "inquiries_insert_customer"
-  on public.inquiries for insert
-  with check (
-    customer_id = auth.uid()
-    and public.get_my_role() = 'customer'
-  );
+-- --- profiles + preferences: hanya pemilik baris (butuh user login Supabase Auth) ---
 
-drop policy if exists "inquiries_select_customer_own" on public.inquiries;
-create policy "inquiries_select_customer_own"
-  on public.inquiries for select
-  using (customer_id = auth.uid());
+drop policy if exists "profiles_select_own" on public.profiles;
+create policy "profiles_select_own"
+  on public.profiles
+  for select
+  to authenticated
+  using (auth.uid() = id);
 
-drop policy if exists "inquiries_select_admin_showroom" on public.inquiries;
-create policy "inquiries_select_admin_showroom"
-  on public.inquiries for select
-  using (
-    public.get_my_role() = 'superadmin'
-    or (
-      public.get_my_role() = 'admin'
-      and showroom_id = public.get_my_showroom_id()
-    )
-  );
+drop policy if exists "profiles_insert_own" on public.profiles;
+create policy "profiles_insert_own"
+  on public.profiles
+  for insert
+  to authenticated
+  with check (auth.uid() = id);
 
-drop policy if exists "inquiries_update_admin_showroom" on public.inquiries;
-create policy "inquiries_update_admin_showroom"
-  on public.inquiries for update
-  using (
-    public.get_my_role() = 'superadmin'
-    or (
-      public.get_my_role() = 'admin'
-      and showroom_id = public.get_my_showroom_id()
-    )
-  )
-  with check (
-    public.get_my_role() = 'superadmin'
-    or (
-      public.get_my_role() = 'admin'
-      and showroom_id = public.get_my_showroom_id()
-    )
-  );
+drop policy if exists "profiles_update_own" on public.profiles;
+create policy "profiles_update_own"
+  on public.profiles
+  for update
+  to authenticated
+  using (auth.uid() = id)
+  with check (auth.uid() = id);
 
--- User settings
-drop policy if exists "user_settings_select_own" on public.user_settings;
-create policy "user_settings_select_own"
-  on public.user_settings for select
-  using (user_id = auth.uid());
+drop policy if exists "user_preferences_select_own" on public.user_preferences;
+create policy "user_preferences_select_own"
+  on public.user_preferences
+  for select
+  to authenticated
+  using (auth.uid() = user_id);
 
-drop policy if exists "user_settings_insert_own" on public.user_settings;
-create policy "user_settings_insert_own"
-  on public.user_settings for insert
-  with check (user_id = auth.uid());
+drop policy if exists "user_preferences_insert_own" on public.user_preferences;
+create policy "user_preferences_insert_own"
+  on public.user_preferences
+  for insert
+  to authenticated
+  with check (auth.uid() = user_id);
 
-drop policy if exists "user_settings_update_own" on public.user_settings;
-create policy "user_settings_update_own"
-  on public.user_settings for update
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+drop policy if exists "user_preferences_update_own" on public.user_preferences;
+create policy "user_preferences_update_own"
+  on public.user_preferences
+  for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
--- ==============================
--- Storage (motorcycle images)
--- ==============================
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values (
-  'motorcycles',
-  'motorcycles',
-  true,
-  10485760,
-  array['image/jpeg', 'image/png', 'image/webp']
-)
-on conflict (id) do nothing;
+-- -----------------------------------------------------------------------------
+-- 6) Storage — bucket + policy (schema storage)
+-- -----------------------------------------------------------------------------
+-- Kode app: supabase.storage.from('motorcycles').upload('admin-uploads/...')
 
-drop policy if exists "storage_motorcycles_public_read" on storage.objects;
-create policy "storage_motorcycles_public_read"
-  on storage.objects for select
+insert into storage.buckets (id, name, public)
+values ('motorcycles', 'motorcycles', true)
+on conflict (id) do update
+set public = excluded.public;
+
+drop policy if exists "motorcycles_storage_select" on storage.objects;
+create policy "motorcycles_storage_select"
+  on storage.objects
+  for select
+  to public
   using (bucket_id = 'motorcycles');
 
-drop policy if exists "storage_motorcycles_admin_upload" on storage.objects;
-create policy "storage_motorcycles_admin_upload"
-  on storage.objects for insert
-  with check (
-    bucket_id = 'motorcycles'
-    and public.get_my_role() in ('admin', 'superadmin')
-  );
+drop policy if exists "motorcycles_storage_insert" on storage.objects;
+create policy "motorcycles_storage_insert"
+  on storage.objects
+  for insert
+  to public
+  with check (bucket_id = 'motorcycles');
 
-drop policy if exists "storage_motorcycles_admin_update" on storage.objects;
-create policy "storage_motorcycles_admin_update"
-  on storage.objects for update
-  using (
-    bucket_id = 'motorcycles'
-    and public.get_my_role() in ('admin', 'superadmin')
-  )
-  with check (
-    bucket_id = 'motorcycles'
-    and public.get_my_role() in ('admin', 'superadmin')
-  );
+drop policy if exists "motorcycles_storage_update" on storage.objects;
+create policy "motorcycles_storage_update"
+  on storage.objects
+  for update
+  to public
+  using (bucket_id = 'motorcycles')
+  with check (bucket_id = 'motorcycles');
 
-drop policy if exists "storage_motorcycles_admin_delete" on storage.objects;
-create policy "storage_motorcycles_admin_delete"
-  on storage.objects for delete
-  using (
-    bucket_id = 'motorcycles'
-    and public.get_my_role() in ('admin', 'superadmin')
-  );
-
-commit;
+drop policy if exists "motorcycles_storage_delete" on storage.objects;
+create policy "motorcycles_storage_delete"
+  on storage.objects
+  for delete
+  to public
+  using (bucket_id = 'motorcycles');

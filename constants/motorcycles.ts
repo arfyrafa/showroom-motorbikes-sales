@@ -1,3 +1,5 @@
+export type MotorcycleListingStatus = 'available' | 'sold_out';
+
 export interface Motorcycle {
   motorcycle_id: string;
   title: string;
@@ -9,4 +11,6 @@ export interface Motorcycle {
   engineCapacity: string;
   mileage: string;
   description?: string;
+  /** Ketersediaan di showroom; dari API selalu terisi; snapshot booking lokal bisa tidak ada. */
+  listingStatus?: MotorcycleListingStatus;
 }
