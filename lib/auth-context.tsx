@@ -1,5 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { supabase } from './supabase';
 
 export type UserRole = 'admin' | 'user';
 
@@ -21,97 +21,68 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users (dummy untuk testing)
-const MOCK_USERS = [
-  {
-    id: '1',
-    email: 'admin@showroom.com',
-    password: 'admin123',
-    name: 'Admin Showroom',
-    role: 'admin' as UserRole,
-  },
-  {
-    id: '2',
-    email: 'user@showroom.com',
-    password: 'user123',
-    name: 'Regular User',
-    role: 'user' as UserRole,
-  },
-];
-
-const STORAGE_KEY = '@auth_user';
-const STORAGE_USERS_KEY = '@registered_users';
-
-async function getRegisteredUsers() {
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_USERS_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch (error) {
-    console.error('Error getting registered users:', error);
-    return [];
-  }
-}
-
-async function saveRegisteredUsers(users: any[]) {
-  try {
-    await AsyncStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
-  } catch (error) {
-    console.error('Error saving registered users:', error);
-  }
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check if user sudah login sebelumnya
+  // Fungsi helper untuk mapping data user Supabase ke interface AuthUser
+  const mapSupabaseUser = (sbUser: any): AuthUser => {
+    return {
+      id: sbUser.id,
+      email: sbUser.email!,
+      name: sbUser.user_metadata?.name || 'Unknown User',
+      role: (sbUser.user_metadata?.role as UserRole) || 'user',
+    };
+  };
+
   useEffect(() => {
-    async function checkAuth() {
-      try {
-        const storedUser = await AsyncStorage.getItem(STORAGE_KEY);
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
+    let mounted = true;
+
+    // 1. Ambil session saat ini ketika app pertama dibuka
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('Error getting session:', error.message);
+      }
+      
+      if (mounted) {
+        if (session?.user) {
+          setUser(mapSupabaseUser(session.user));
+        } else {
+          setUser(null);
         }
-      } catch (error) {
-        console.error('Error checking auth:', error);
-      } finally {
         setIsLoading(false);
       }
-    }
+    });
 
-    checkAuth();
+    // 2. Dengarkan perubahan status auth (login, logout, token refresh)
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (mounted) {
+          if (session?.user) {
+            setUser(mapSupabaseUser(session.user));
+          } else {
+            setUser(null);
+          }
+          setIsLoading(false);
+        }
+      }
+    );
+
+    return () => {
+      mounted = false;
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // Check mock users first
-      let foundUser = MOCK_USERS.find((u) => u.email === email && u.password === password);
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      // If not found in mock, check registered users
-      if (!foundUser) {
-        const registeredUsers = await getRegisteredUsers();
-        const registered = registeredUsers.find(
-          (u: any) => u.email === email && u.password === password
-        );
-        if (registered) {
-          foundUser = registered;
-        }
-      }
-
-      if (!foundUser) {
-        throw new Error('Email atau password salah');
-      }
-
-      const authUser: AuthUser = {
-        id: foundUser.id,
-        email: foundUser.email,
-        name: foundUser.name,
-        role: foundUser.role,
-      };
-
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
-      setUser(authUser);
+      if (error) throw error;
     } finally {
       setIsLoading(false);
     }
@@ -120,9 +91,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     setIsLoading(true);
     try {
-      await AsyncStorage.removeItem(STORAGE_KEY);
-      setUser(null);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
     } finally {
+      // onAuthStateChange akan menangani set user menjadi null
       setIsLoading(false);
     }
   }, []);
@@ -130,40 +102,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = useCallback(async (email: string, password: string, name: string) => {
     setIsLoading(true);
     try {
-      // Check if email sudah digunakan
-      let existingUser = MOCK_USERS.find((u) => u.email === email);
-      if (!existingUser) {
-        const registeredUsers = await getRegisteredUsers();
-        existingUser = registeredUsers.find((u: any) => u.email === email);
-      }
-
-      if (existingUser) {
-        throw new Error('Email sudah digunakan');
-      }
-
-      // Create new user
-      const registeredUsers = await getRegisteredUsers();
-      const newUser = {
-        id: `reg_${Date.now()}`,
+      const { error } = await supabase.auth.signUp({
         email,
         password,
-        name,
-        role: 'user' as UserRole,
-      };
+        options: {
+          data: {
+            name: name,
+            role: 'user', // Default role
+          },
+        },
+      });
 
-      registeredUsers.push(newUser);
-      await saveRegisteredUsers(registeredUsers);
-
-      // Auto login after registration
-      const authUser: AuthUser = {
-        id: newUser.id,
-        email: newUser.email,
-        name: newUser.name,
-        role: newUser.role,
-      };
-
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
-      setUser(authUser);
+      if (error) throw error;
+      
+      // Catatan: Jika 'Confirm email' dinyalakan di Supabase Dashboard,
+      // user tidak otomatis login sampai mereka memverifikasi email.
     } finally {
       setIsLoading(false);
     }
@@ -192,3 +145,4 @@ export function useAuth() {
   }
   return context;
 }
+

@@ -17,11 +17,12 @@ function RootLayoutNav() {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === '(auth)' || segments[0] === 'login' || segments[0] === 'register' || segments[0] === 'index';
+    const currentSegment = segments[0] as string;
+    const inAuthGroup = currentSegment === '(auth)' || currentSegment === 'login' || currentSegment === 'register' || currentSegment === 'index';
 
     if (!isSignedIn) {
       // ALWAYS go to login if not signed in, regardless of current screen
-      if (segments[0] !== 'login' && segments[0] !== 'register' && segments[0] !== 'index') {
+      if (currentSegment !== 'login' && currentSegment !== 'register' && currentSegment !== 'index') {
         router.replace('/login');
       }
     } else if (isSignedIn && inAuthGroup) {
@@ -43,7 +44,9 @@ function RootLayoutNav() {
         <Stack.Screen name="settings-account" options={{ headerShown: false }} />
         <Stack.Screen name="settings-change-password" options={{ headerShown: false }} />
         <Stack.Screen name="admin-motorcycle" options={{ headerShown: false }} />
+        <Stack.Screen name="admin-leads" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        <Stack.Screen name="schedule-visit" options={{ presentation: 'modal', title: 'Jadwalkan Kunjungan' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

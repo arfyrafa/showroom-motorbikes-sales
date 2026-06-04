@@ -39,7 +39,11 @@ export default function RegisterScreen() {
     setIsLoading(true);
     try {
       await register(email, password, name);
-      // Auto login setelah register
+      // Show success message, especially useful if email confirmation is required
+      Alert.alert(
+        'Registrasi Berhasil',
+        'Akun berhasil dibuat. Jika Anda tidak otomatis login, silakan cek email Anda untuk tautan verifikasi.'
+      );
     } catch (error) {
       Alert.alert('Signup Gagal', error instanceof Error ? error.message : 'Terjadi kesalahan');
     } finally {

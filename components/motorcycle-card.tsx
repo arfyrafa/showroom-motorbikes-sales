@@ -1,4 +1,5 @@
 import { Motorcycle } from '@/constants/motorcycles';
+import { shareMotorcycle } from '@/lib/share';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -50,6 +51,18 @@ export function MotorcycleCard({ motorcycle, onPress }: MotorcycleCardProps) {
               <Text style={styles.location}>{motorcycle.engineCapacity}</Text>
             ) : null}
           </View>
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              shareMotorcycle(motorcycle);
+            }}
+            style={({ pressed }) => [
+              styles.shareBtn,
+              pressed && styles.shareBtnPressed,
+            ]}
+          >
+            <FontAwesome6 name="share-nodes" size={14} color="#666" />
+          </Pressable>
         </View>
       </View>
     </Pressable>
@@ -138,5 +151,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginLeft: 4,
+  },
+  shareBtn: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  shareBtnPressed: {
+    backgroundColor: '#e5e5e5',
+    opacity: 0.8,
   },
 });

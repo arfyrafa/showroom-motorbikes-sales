@@ -2,9 +2,9 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
     FlatList,
     Pressable,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -14,18 +14,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MotorcycleCard } from '@/components/motorcycle-card';
 import { useMotorcycles } from '@/hooks/use-motorcycles';
+import { Skeleton } from '@/components/skeleton';
 
 export default function TabTwoScreen() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const { motorcycles, isLoading, error, refresh } = useMotorcycles();
 
+  const categories = ['All', 'Sport', 'Scooter', 'Adventure', 'Electric'];
+
   const filteredMotorcycles = useMemo(() => {
-    return motorcycles.filter((motorcycle) =>
-      motorcycle.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      motorcycle.location.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [motorcycles, searchQuery]);
+    return motorcycles.filter((motorcycle) => {
+      if (motorcycle.listingStatus === 'sold_out') return false;
+
+      const matchesSearch = 
+        motorcycle.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        motorcycle.engineCapacity.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesCategory = 
+        selectedCategory === 'All' || 
+        motorcycle.engineCapacity.toLowerCase() === selectedCategory.toLowerCase();
+
+      return matchesSearch && matchesCategory;
+    });
+  }, [motorcycles, searchQuery, selectedCategory]);
 
   const handleMotorcyclePress = (motorcycle_id: string) => {
     router.push({
@@ -35,77 +47,88 @@ export default function TabTwoScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>MotoMarket</Text>
+        <Text style={styles.title}>Marketplace</Text>
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
           <FontAwesome6 name="magnifying-glass" size={16} color="#999" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search motorcycles..."
+            placeholder="Search motorcycles or brands..."
             placeholderTextColor="#ccc"
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
         </View>
 
-        {/* Filters Button */}
-        <View style={styles.filtersRow}>
-          <Pressable style={styles.filterButton} onPress={() => setShowFilters(!showFilters)}>
-            <FontAwesome6 name="bars" size={14} color="#fff" />
-            <Text style={styles.filterButtonText}>Filters</Text>
-          </Pressable>
-        </View>
-
-        {/* Count */}
-        <Text style={styles.countText}>
-          {filteredMotorcycles.length} motorcycle{filteredMotorcycles.length !== 1 ? 's' : ''} found
-        </Text>
+        {/* Horizontal Categories */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          style={styles.categoriesScroll}
+          contentContainerStyle={styles.categoriesContent}
+        >
+          {categories.map((cat) => (
+            <Pressable
+              key={cat}
+              onPress={() => setSelectedCategory(cat)}
+              style={[
+                styles.categoryChip,
+                selectedCategory === cat && styles.categoryChipActive,
+              ]}
+            >
+              <Text style={[
+                styles.categoryText,
+                selectedCategory === cat && styles.categoryTextActive
+              ]}>{cat}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
       </View>
 
       {/* Motorcycle List */}
-      <FlatList
-        data={filteredMotorcycles}
-        keyExtractor={(item) => item.motorcycle_id}
-        renderItem={({ item }) => (
-          <MotorcycleCard
-            motorcycle={item}
-            onPress={() => handleMotorcyclePress(item.motorcycle_id)}
-          />
-        )}
-        contentContainerStyle={styles.listContent}
-        refreshing={isLoading && !error}
-        onRefresh={refresh}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            {isLoading && !error ? (
-              <ActivityIndicator size="large" color="#ff6f10" />
-            ) : error ? (
-              <>
-                <FontAwesome6 name="triangle-exclamation" size={48} color="#F44336" />
-                <Text style={styles.emptyTitle}>Database Connection Error</Text>
-                <Text style={styles.emptyText}>{error}</Text>
-                <Text style={styles.debugText}>
-                  {`Pastikan tabel 'motorcycles' ada di Supabase dan RLS mengizinkan SELECT; bucket Storage 'motorcycles' untuk upload gambar.`}
-                </Text>
-                <Pressable style={styles.retryButton} onPress={refresh}>
-                  <FontAwesome6 name="rotate" size={16} color="#fff" />
-                  <Text style={styles.retryText}>Retry</Text>
-                </Pressable>
-              </>
-            ) : (
-              <>
-                <FontAwesome6 name="motorcycle" size={48} color="#ccc" />
-                <Text style={styles.emptyText}>Belum ada motor tersedia</Text>
-              </>
-            )}
-          </View>
-        }
-        scrollEnabled
-        nestedScrollEnabled
-      />
+      {isLoading && filteredMotorcycles.length === 0 ? (
+        <View style={styles.listContent}>
+          <Skeleton width="100%" height={200} borderRadius={16} style={{ marginBottom: 16 }} />
+          <Skeleton width="100%" height={200} borderRadius={16} style={{ marginBottom: 16 }} />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredMotorcycles}
+          keyExtractor={(item) => item.motorcycle_id}
+          renderItem={({ item }) => (
+            <MotorcycleCard
+              motorcycle={item}
+              onPress={() => handleMotorcyclePress(item.motorcycle_id)}
+            />
+          )}
+          contentContainerStyle={styles.listContent}
+          refreshing={isLoading && !error}
+          onRefresh={refresh}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              {error ? (
+                <>
+                  <FontAwesome6 name="triangle-exclamation" size={48} color="#F44336" />
+                  <Text style={styles.emptyTitle}>Connection Error</Text>
+                  <Text style={styles.emptyText}>{error}</Text>
+                  <Pressable style={styles.retryButton} onPress={refresh}>
+                    <FontAwesome6 name="rotate" size={16} color="#fff" />
+                    <Text style={styles.retryText}>Retry</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <FontAwesome6 name="motorcycle" size={48} color="#ccc" />
+                  <Text style={styles.emptyText}>No motorcycles found</Text>
+                </>
+              )}
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -113,13 +136,13 @@ export default function TabTwoScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#fff',
   },
   header: {
     backgroundColor: '#fff',
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 12,
+    paddingBottom: 8,
   },
   title: {
     fontSize: 28,
@@ -131,10 +154,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 12,
-    marginBottom: 12,
-    height: 42,
+    marginBottom: 16,
+    height: 46,
   },
   searchIcon: {
     marginRight: 10,
@@ -144,37 +167,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1a1a1a',
   },
-  filtersRow: {
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ff6f10',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6,
-  },
-  filterButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  countText: {
-    fontSize: 13,
-    color: '#666',
+  categoriesScroll: {
     marginBottom: 8,
+  },
+  categoriesContent: {
+    paddingRight: 20,
+    gap: 10,
+  },
+  categoryChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  categoryChipActive: {
+    backgroundColor: '#ff6f10',
+    borderColor: '#ff6f10',
+  },
+  categoryText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+  },
+  categoryTextActive: {
+    color: '#fff',
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingTop: 10,
+    paddingBottom: 20,
   },
   emptyContainer: {
-    paddingVertical: 40,
+    paddingVertical: 60,
     alignItems: 'center',
-    marginTop: 20,
   },
   emptyTitle: {
     fontSize: 18,
@@ -187,15 +214,7 @@ const styles = StyleSheet.create({
     color: '#777',
     fontSize: 14,
     textAlign: 'center',
-    marginBottom: 12,
-  },
-  debugText: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    fontStyle: 'italic',
+    marginTop: 12,
   },
   retryButton: {
     flexDirection: 'row',
@@ -205,7 +224,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 8,
     gap: 8,
-    marginTop: 8,
+    marginTop: 16,
   },
   retryText: {
     color: '#fff',

@@ -1,5 +1,7 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { Platform } from 'react-native';
+import { useAuth } from '@/lib/auth-context';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -8,6 +10,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { user } = useAuth();
+  const isWebAdmin = user?.role === 'admin' && Platform.OS === 'web';
 
   return (
     <Tabs
@@ -15,6 +19,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarStyle: isWebAdmin ? { display: 'none' } : undefined,
       }}>
       <Tabs.Screen
         name="index"

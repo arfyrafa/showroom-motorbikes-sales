@@ -13,4 +13,5 @@ export interface Motorcycle {
   description?: string;
   /** Ketersediaan di showroom; dari API selalu terisi; snapshot booking lokal bisa tidak ada. */
   listingStatus?: MotorcycleListingStatus;
+  createdAt?: string;
 }

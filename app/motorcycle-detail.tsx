@@ -1,63 +1,92 @@
 import { FontAwesome6 } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Skeleton } from '@/components/skeleton';
 import { useBookings } from '@/hooks/use-bookings';
 import { useMotorcycles } from '@/hooks/use-motorcycles';
+import { useAuth } from '@/lib/auth-context';
+import { shareMotorcycle } from '@/lib/share';
 
+const { width } = Dimensions.get('window');
 export default function MotorcycleDetailScreen() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const id = typeof params.id === 'string' ? params.id : params.id?.[0];
   const { addBooking, bookings } = useBookings();
   const { motorcycles, isLoading } = useMotorcycles();
+  const { user } = useAuth();
   const [isInterested, setIsInterested] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const lastRecordedViewIdRef = useRef<string | null>(null);
 
   const motorcycle = id ? motorcycles.find((m) => m.motorcycle_id === id) : undefined;
   const isSoldOut = motorcycle?.listingStatus === 'sold_out';
+  const isAdmin = user?.role === 'admin';
   const formattedPrice = motorcycle
     ? motorcycle.price.toLocaleString('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        maximumFractionDigits: 0,
-      })
+      style: 'currency',
+      currency: 'IDR',
+      maximumFractionDigits: 0,
+    })
     : '';
 
-  // Track view once per product open (avoids loop: addBooking used to depend on bookings → new ref every update)
+  // Track view
   useEffect(() => {
     if (!id || !motorcycle) return;
     if (lastRecordedViewIdRef.current === id) return;
     lastRecordedViewIdRef.current = id;
-    void addBooking(motorcycle, 'view');
+    void addBooking(id, 'view');
   }, [id, motorcycle, addBooking]);
 
-  // Check if user is already interested in this motorcycle
   useEffect(() => {
     if (motorcycle && bookings) {
       const interested = bookings.find(
-        (b) => b.motorcycle.motorcycle_id === motorcycle.motorcycle_id && b.type === 'interested'
+        (b) => b.motorcycle_id === motorcycle.motorcycle_id && b.type === 'interested'
       );
       setIsInterested(!!interested);
     }
   }, [motorcycle, bookings]);
 
   const handleInterestedPress = async () => {
-    if (id && motorcycle && !isSoldOut) {
-      await addBooking(motorcycle, 'interested');
+    if (id && motorcycle && !isSoldOut && !isInterested) {
+      await addBooking(id, 'interested');
       setIsInterested(true);
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 2000);
     }
   };
 
+  const handleWhatsAppPress = () => {
+    if (!motorcycle) return;
+    const waNumber = '6285721610319';
+    const message = `Halo Admin MotoMarket, saya tertarik dengan motor ${motorcycle.title} (${formattedPrice}). Apakah unit ini masih tersedia?`;
+    Linking.openURL(`whatsapp://send?phone=${waNumber}&text=${encodeURIComponent(message)}`);
+    if (!isInterested) handleInterestedPress();
+  };
+
+  const handleSharePress = async () => {
+    if (!motorcycle) return;
+    await shareMotorcycle(motorcycle);
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.screen}>
-        <Text style={styles.errorText}>Loading...</Text>
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <FontAwesome6 name="chevron-left" size={24} color="#1a1a1a" />
+          </Pressable>
+        </View>
+        <Skeleton width="100%" height={300} />
+        <View style={styles.content}>
+          <Skeleton width="70%" height={30} style={{ marginBottom: 10 }} />
+          <Skeleton width="40%" height={35} style={{ marginBottom: 20 }} />
+          <Skeleton width="100%" height={100} borderRadius={12} />
+        </View>
       </SafeAreaView>
     );
   }
@@ -65,122 +94,140 @@ export default function MotorcycleDetailScreen() {
   if (!motorcycle) {
     return (
       <SafeAreaView style={styles.screen}>
-        <Text style={styles.errorText}>Motorcycle not found</Text>
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <FontAwesome6 name="chevron-left" size={24} color="#1a1a1a" />
+          </Pressable>
+        </View>
+        <View style={styles.emptyContainer}>
+          <FontAwesome6 name="circle-exclamation" size={60} color="#ddd" />
+          <Text style={styles.errorText}>Motorcycle not found</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
-      {/* Back Button */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <FontAwesome6 name="chevron-left" size={24} color="#1a1a1a" />
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
-      </View>
+    <View style={styles.screen}>
+      <ScrollView showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
+        {/* Header Overlay */}
+        <View style={styles.headerOverlay}>
+          <Pressable onPress={() => router.back()} style={styles.iconButton}>
+            <FontAwesome6 name="chevron-left" size={18} color="#1a1a1a" />
+          </Pressable>
+          <Pressable onPress={handleSharePress} style={styles.iconButton}>
+            <FontAwesome6 name="share-nodes" size={18} color="#1a1a1a" />
+          </Pressable>
+        </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Image */}
+        {/* Hero Image */}
         <View style={styles.imageContainer}>
           <Image
             source={{ uri: motorcycle.image }}
             style={[styles.image, isSoldOut && styles.imageDimmed]}
             contentFit="cover"
           />
-          {isSoldOut ? (
-            <View style={styles.soldOutRibbon}>
-              <Text style={styles.soldOutRibbonText}>Sold out</Text>
+          {isSoldOut && (
+            <View style={styles.soldOutBadge}>
+              <Text style={styles.soldOutText}>UNIT SOLD</Text>
             </View>
-          ) : null}
+          )}
         </View>
 
         {/* Content */}
         <View style={styles.content}>
-          {/* Title and Price */}
-          <Text style={styles.title}>{motorcycle.title}</Text>
-          <Text style={styles.price}>{formattedPrice}</Text>
-
-          {/* Brand */}
-          {motorcycle.engineCapacity && motorcycle.engineCapacity !== '-' ? (
-            <View style={styles.locationRow}>
-              <FontAwesome6 name="motorcycle" size={14} color="#ff6f10" />
-              <Text style={styles.location}>{motorcycle.engineCapacity}</Text>
-            </View>
-          ) : null}
-
-          {/* Rating */}
-          {motorcycle.rating && (
-            <View style={styles.ratingContainer}>
-              <View style={styles.starsRow}>
-                {[...Array(5)].map((_, i) => (
-                  <FontAwesome6
-                    key={i}
-                    name={i < Math.floor(motorcycle.rating || 0) ? 'star' : 'star'}
-                    size={14}
-                    color={i < Math.floor(motorcycle.rating || 0) ? '#ff6f10' : '#ddd'}
-                  />
-                ))}
-              </View>
-              <Text style={styles.ratingText}>{motorcycle.rating} rating</Text>
-            </View>
-          )}
-
-          {/* Description */}
-          {motorcycle.description && (
-            <View style={styles.descriptionContainer}>
-              <Text style={styles.descriptionText}>{motorcycle.description}</Text>
-            </View>
-          )}
-
-          {isSoldOut ? (
-            <View style={styles.soldOutNotice}>
-              <FontAwesome6 name="circle-info" size={16} color="#666" />
-              <Text style={styles.soldOutNoticeText}>
-                Unit ini sudah terjual / tidak tersedia. Kamu tetap bisa melihat detailnya.
+          {isSoldOut && !isAdmin && (
+            <View style={styles.soldOutBanner}>
+              <FontAwesome6 name="circle-info" size={16} color="#c62828" />
+              <Text style={styles.soldOutBannerText}>
+                Unit ini sudah terjual (Sold Out) dan tidak tersedia lagi di showroom.
               </Text>
             </View>
-          ) : null}
-
-          {/* I'm Interested Button */}
-          <Pressable
-            style={[
-              styles.interestedButton,
-              isInterested && styles.interestedButtonActive,
-              isSoldOut && styles.interestedButtonDisabled,
-            ]}
-            onPress={handleInterestedPress}
-            disabled={isInterested || isSoldOut}
-          >
-            <FontAwesome6
-              name={isInterested ? 'check' : 'heart'}
-              size={16}
-              color="#fff"
-              style={styles.buttonIcon}
-            />
-            <Text style={styles.interestedText}>
-              {isSoldOut
-                ? 'Tidak tersedia'
-                : isInterested
-                  ? 'Added to Bookings'
-                  : "I'm Interested"}
-            </Text>
-          </Pressable>
-
-          {showSuccessMessage && (
-            <View style={styles.successMessage}>
-              <FontAwesome6 name="check-circle" size={16} color="#4CAF50" />
-              <Text style={styles.successText}>Added to your bookings!</Text>
-            </View>
           )}
+          <View style={styles.mainInfo}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>{motorcycle.title}</Text>
+              <View style={styles.yearBadge}>
+                <Text style={styles.yearText}>{motorcycle.year}</Text>
+              </View>
+            </View>
+            <Text style={styles.price}>{formattedPrice}</Text>
+          </View>
 
-          <View style={styles.spacer} />
+          {/* Key Specs Row */}
+          <View style={styles.specRow}>
+            <SpecItem icon="gauge-high" label="Engine" value={motorcycle.engineCapacity} />
+            <SpecItem icon="road" label="Mileage" value={motorcycle.mileage} />
+            <SpecItem icon="location-dot" label="Location" value="Jakarta" />
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* Description */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Description</Text>
+            <Text style={styles.descriptionText}>{motorcycle.description || 'No description available for this unit.'}</Text>
+          </View>
+
+          {/* Specifications Table */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Specifications</Text>
+            <View style={styles.specTable}>
+              <TableRow label="Brand" value={motorcycle.engineCapacity.split(' ')[0]} />
+              <TableRow label="Model Year" value={motorcycle.year.toString()} />
+              <TableRow label="Condition" value="Pre-owned" />
+              <TableRow label="Listing Status" value={motorcycle.listingStatus === 'available' ? 'Available' : 'Sold'} />
+            </View>
+          </View>
+
+          <View style={{ height: 100 }} />
         </View>
       </ScrollView>
 
-      {/* Bottom Tab Navigation Spacer */}
-      <View style={styles.tabSpacer} />
-    </SafeAreaView>
+      {/* Floating Action Bar */}
+      <View style={styles.bottomBar}>
+        {isSoldOut && !isAdmin ? (
+          <View style={styles.disabledBottomBarBtn}>
+            <FontAwesome6 name="ban" size={16} color="#999" style={{ marginRight: 8 }} />
+            <Text style={styles.disabledBottomBarBtnText}>UNIT SOLD OUT / TERJUAL</Text>
+          </View>
+        ) : (
+          <>
+            <Pressable
+              style={[styles.wishlistBtn, isInterested && styles.wishlistBtnActive]}
+              onPress={handleInterestedPress}
+            >
+              <FontAwesome6 name="heart" size={20} color={isInterested ? '#fff' : '#ff6f10'} solid={isInterested} />
+            </Pressable>
+            <Pressable style={styles.waBtn} onPress={handleWhatsAppPress}>
+              <FontAwesome6 name="whatsapp" size={20} color="#fff" />
+              <Text style={styles.waBtnText}>Contact Seller</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function SpecItem({ icon, label, value }: { icon: string; label: string; value: string }) {
+  return (
+    <View style={styles.specItem}>
+      <View style={styles.specIconBg}>
+        <FontAwesome6 name={icon} size={14} color="#ff6f10" />
+      </View>
+      <Text style={styles.specLabel}>{label}</Text>
+      <Text style={styles.specValue}>{value}</Text>
+    </View>
+  );
+}
+
+function TableRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.tableRow}>
+      <Text style={styles.tableLabel}>{label}</Text>
+      <Text style={styles.tableValue}>{value}</Text>
+    </View>
   );
 }
 
@@ -192,192 +239,261 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  backText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
+  headerOverlay: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    zIndex: 10,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  backButton: {
+    padding: 4,
   },
   imageContainer: {
-    width: '100%',
-    height: 300,
-    backgroundColor: '#f0f0f0',
-    position: 'relative',
+    width: width,
+    height: width * 0.8,
+    backgroundColor: '#f5f5f5',
   },
   image: {
     width: '100%',
     height: '100%',
   },
   imageDimmed: {
-    opacity: 0.55,
+    opacity: 0.6,
   },
-  soldOutRibbon: {
+  soldOutBadge: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.72)',
+    top: '40%',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    paddingHorizontal: 20,
     paddingVertical: 10,
-    alignItems: 'center',
+    borderRadius: 8,
   },
-  soldOutRibbonText: {
+  soldOutText: {
     color: '#fff',
-    fontSize: 14,
     fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  soldOutNotice: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 12,
-  },
-  soldOutNoticeText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#555',
-    lineHeight: 18,
+    fontSize: 18,
+    letterSpacing: 1,
   },
   content: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    marginTop: -30,
+    paddingHorizontal: 20,
+    paddingTop: 30,
+  },
+  mainInfo: {
+    marginBottom: 25,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  price: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
-    color: '#ff6f10',
-    marginBottom: 12,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  location: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 6,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  starsRow: {
-    flexDirection: 'row',
-    gap: 4,
+    color: '#1a1a1a',
+    flex: 1,
     marginRight: 10,
   },
-  ratingText: {
+  yearBadge: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  yearText: {
     fontSize: 14,
+    fontWeight: '700',
     color: '#666',
   },
-  specsContainer: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  specsTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 16,
+  price: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#ff6f10',
+    marginTop: 8,
   },
   specRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 30,
   },
   specItem: {
-    flex: 1,
     alignItems: 'center',
+    flex: 1,
+  },
+  specIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#fff5ed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   specLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#999',
-    marginTop: 8,
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
   specValue: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1a1a1a',
-    marginTop: 4,
-  },
-  descriptionContainer: {
-    marginBottom: 16,
-  },
-  descriptionText: {
-    fontSize: 14,
-    color: '#555',
-    lineHeight: 20,
-  },
-  interestedButton: {
-    backgroundColor: '#ff6f10',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 16,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  interestedButtonActive: {
-    backgroundColor: '#4CAF50',
-    opacity: 0.8,
-  },
-  interestedButtonDisabled: {
-    backgroundColor: '#bdbdbd',
-  },
-  buttonIcon: {
     marginTop: 2,
   },
-  interestedText: {
-    color: '#fff',
-    fontSize: 16,
+  divider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+    marginBottom: 25,
+  },
+  section: {
+    marginBottom: 30,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    marginBottom: 15,
+  },
+  descriptionText: {
+    fontSize: 15,
+    color: '#666',
+    lineHeight: 24,
+  },
+  specTable: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 16,
+    padding: 15,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  tableLabel: {
+    fontSize: 14,
+    color: '#999',
+    fontWeight: '500',
+  },
+  tableValue: {
+    fontSize: 14,
+    color: '#1a1a1a',
     fontWeight: '700',
   },
-  successMessage: {
-    backgroundColor: '#E8F5E9',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginBottom: 16,
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingTop: 15,
+    paddingBottom: 35,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    gap: 15,
   },
-  successText: {
-    color: '#2E7D32',
-    fontSize: 13,
-    fontWeight: '600',
+  wishlistBtn: {
+    width: 55,
+    height: 55,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#ff6f10',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  spacer: {
-    height: 20,
+  wishlistBtnActive: {
+    backgroundColor: '#ff6f10',
   },
-  tabSpacer: {
-    height: 16,
+  waBtn: {
+    flex: 1,
+    height: 55,
+    backgroundColor: '#ff6f10',
+    borderRadius: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 10,
+  },
+  waBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 100,
   },
   errorText: {
     fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 32,
+    color: '#999',
+    fontWeight: '600',
+    marginTop: 15,
+  },
+  soldOutBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffebee',
+    borderWidth: 1,
+    borderColor: '#ffcdd2',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 20,
+    gap: 8,
+  },
+  soldOutBannerText: {
+    color: '#c62828',
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+  },
+  disabledBottomBarBtn: {
+    flex: 1,
+    height: 55,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  disabledBottomBarBtnText: {
+    color: '#999',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
 });

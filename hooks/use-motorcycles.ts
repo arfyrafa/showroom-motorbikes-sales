@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { decode } from 'base64-arraybuffer';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useCallback, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 
 interface RawMotorcycleRow {
   motorcycle_id: string;
@@ -11,6 +12,7 @@ interface RawMotorcycleRow {
   brand: string | null;
   description: string | null;
   listing_status?: MotorcycleListingStatus | null;
+  created_at?: string;
 }
 
 interface MotorcycleImageRow {
@@ -62,13 +64,35 @@ function mapRowToMotorcycle(row: RawMotorcycleRow, imageUrl?: string): Motorcycl
     mileage: '-',
     description: row.description ?? undefined,
     listingStatus,
+    createdAt: row.created_at ?? undefined,
   };
 }
 
 async function uploadImageToStorage(uri: string, mimeType?: string) {
-  const base64 = await FileSystem.readAsStringAsync(uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
+  let base64 = '';
+  if (Platform.OS === 'web') {
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const resultStr = reader.result as string;
+          const base64Str = resultStr.split(',')[1];
+          resolve(base64Str);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (err) {
+      console.error('Error reading file as base64 on web:', err);
+    }
+  } else {
+    base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+  }
+
   const arrayBuffer = decode(base64);
   const normalizedMimeType = inferMimeType(uri, mimeType);
   const extFromMime = normalizedMimeType.split('/')[1];
@@ -114,7 +138,7 @@ export function useMotorcycles() {
     try {
       const { data: motorcycleRows, error: fetchError } = await supabase
         .from('motorcycles')
-        .select('motorcycle_id,name,price,brand,description,listing_status')
+        .select('motorcycle_id,name,price,brand,description,listing_status,created_at')
         .order('created_at', { ascending: false });
 
       if (fetchError) {
@@ -216,6 +240,47 @@ export function useMotorcycles() {
     [fetchMotorcycles]
   );
 
+  const updateMotorcycleByAdmin = useCallback(
+    async (
+      motorcycleId: string,
+      updates: {
+        name?: string;
+        price?: number;
+        brand?: string;
+        description?: string;
+        listing_status?: MotorcycleListingStatus;
+      }
+    ) => {
+      const { error: updateError } = await supabase
+        .from('motorcycles')
+        .update(updates)
+        .eq('motorcycle_id', motorcycleId);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      await fetchMotorcycles();
+    },
+    [fetchMotorcycles]
+  );
+
+  const deleteMotorcycleByAdmin = useCallback(
+    async (motorcycleId: string) => {
+      const { error: deleteError } = await supabase
+        .from('motorcycles')
+        .delete()
+        .eq('motorcycle_id', motorcycleId);
+
+      if (deleteError) {
+        throw deleteError;
+      }
+
+      await fetchMotorcycles();
+    },
+    [fetchMotorcycles]
+  );
+
   return {
     motorcycles,
     isLoading,
@@ -223,5 +288,7 @@ export function useMotorcycles() {
     refresh: fetchMotorcycles,
     createMotorcycleByAdmin,
     updateMotorcycleListingStatus,
+    updateMotorcycleByAdmin,
+    deleteMotorcycleByAdmin,
   };
 }

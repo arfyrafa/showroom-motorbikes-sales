@@ -3,10 +3,12 @@ import { router } from 'expo-router';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useAuth } from '@/lib/auth-context';
 import { useUserSettings } from '@/hooks/use-user-settings';
 
 export default function SettingsAccountScreen() {
   const { clearAllSettings } = useUserSettings();
+  const { logout } = useAuth();
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -15,8 +17,12 @@ export default function SettingsAccountScreen() {
         text: 'Logout',
         style: 'destructive',
         onPress: async () => {
-          // Navigate to login
-          router.replace('/login');
+          try {
+            await logout();
+            // Auth state change akan trigger redirect di _layout via useEffect
+          } catch (error) {
+            Alert.alert('Error', 'Gagal logout');
+          }
         },
       },
     ]);

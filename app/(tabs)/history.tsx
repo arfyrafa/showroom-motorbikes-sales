@@ -5,23 +5,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MotorcycleCard } from '@/components/motorcycle-card';
 import { useBookings } from '@/hooks/use-bookings';
+import { useMotorcycles } from '@/hooks/use-motorcycles';
+import { Motorcycle } from '@/constants/motorcycles';
 
 export default function HistoryScreen() {
-  const { bookings, isLoading } = useBookings();
+  const { bookings, isLoading: bookingsLoading } = useBookings();
+  const { motorcycles, isLoading: motorcyclesLoading } = useMotorcycles();
+  
+  const isLoading = bookingsLoading || motorcyclesLoading;
 
   // Get unique motorcycles that user is interested in
   const interestedMotorcycles = bookings
     .filter((b) => b.type === 'interested')
-    .reduce(
-      (acc, booking) => {
-        const exists = acc.find((m) => m.motorcycle_id === booking.motorcycle.motorcycle_id);
-        if (!exists) {
-          acc.push(booking.motorcycle);
-        }
-        return acc;
-      },
-      [] as typeof bookings[0]['motorcycle'][]
-    );
+    .map((b) => motorcycles.find((m) => m.motorcycle_id === b.motorcycle_id))
+    .filter((m): m is Motorcycle => m !== undefined)
+    .filter((m, index, self) => self.findIndex((t) => t.motorcycle_id === m.motorcycle_id) === index);
 
   const handleMotorcyclePress = (motorcycle_id: string) => {
     router.push({

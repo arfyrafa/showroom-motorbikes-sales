@@ -64,6 +64,14 @@ export default function SettingsScreen() {
             color: '#1F7A4D',
             route: '/admin-motorcycle',
           },
+          {
+            id: 'admin-leads',
+            label: 'Daftar Peminat',
+            description: 'Lihat daftar prospek dan jadwal kunjungan',
+            icon: 'users' as const,
+            color: '#ff6f10',
+            route: '/admin-leads',
+          },
         ]
       : []),
   ];

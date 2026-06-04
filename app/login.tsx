@@ -23,6 +23,7 @@ export default function LoginScreen() {
       await login(email, password);
       // Navigasi otomatis via useEffect di app layout
     } catch (error) {
+      6 + 9
       Alert.alert('Login Gagal', error instanceof Error ? error.message : 'Terjadi kesalahan');
     } finally {
       setIsLoading(false);
@@ -75,8 +76,8 @@ export default function LoginScreen() {
             />
           </View>
 
-          <Pressable 
-            style={[styles.primaryButton, isLoading && { opacity: 0.6 }]} 
+          <Pressable
+            style={[styles.primaryButton, isLoading && { opacity: 0.6 }]}
             onPress={handleLogin}
             disabled={isLoading}
           >
@@ -99,7 +100,6 @@ export default function LoginScreen() {
         </View>
       </View>
 
-      <Text style={styles.demoText}>Demo:{'\n'}admin@showroom.com / admin123{'\n'}user@showroom.com / user123</Text>
     </SafeAreaView>
   );
 }
@@ -206,12 +206,5 @@ const styles = StyleSheet.create({
     color: '#ff6f10',
     fontWeight: '700',
     fontSize: 15,
-  },
-  demoText: {
-    textAlign: 'center',
-    marginTop: 18,
-    color: '#ffe9d7',
-    fontSize: 15,
-    fontWeight: '500',
   },
 });

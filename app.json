@@ -9,7 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ar7ishere.motomarket",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -48,7 +52,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "8d3e833a-0964-491d-8b3a-6969159bdd45"
+        "projectId": "802d4e91-8c95-40d0-9385-88ac153470dc"
       }
     }
   }

@@ -195,11 +195,11 @@ create policy "motorcycle_bookings_insert_public"
 -- --- profiles + preferences: hanya pemilik baris (butuh user login Supabase Auth) ---
 
 drop policy if exists "profiles_select_own" on public.profiles;
-create policy "profiles_select_own"
+create policy "profiles_select_public"
   on public.profiles
   for select
   to authenticated
-  using (auth.uid() = id);
+  using (true);
 
 drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own"
